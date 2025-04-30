@@ -43,7 +43,7 @@ export default function Onboarding() {
   return (
     <div className="flex flex-col items-center min-h-screen bg-brandBg p-6">
       <div className="flex justify-center mb-8 mt-6">
-        <Logo className="h-12" />
+        <Logo className="h-16" />
       </div>
 
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">

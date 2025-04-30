@@ -12,7 +12,7 @@ export default function WelcomeScreen() {
       <div className="flex flex-col items-center justify-center space-y-8 max-w-md text-center">
         <div className="space-y-2">
           <div className="flex justify-center mb-4">
-            <Logo className="h-16" />
+            <Logo className="h-20" />
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-gray-900">
             Welcome
