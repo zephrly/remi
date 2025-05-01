@@ -1,4 +1,5 @@
 import { Contact } from "../types/user";
+import { supabase } from "../lib/supabase";
 
 // Mock data for contacts
 const mockPhoneContacts: Contact[] = [
@@ -79,6 +80,18 @@ const mockFacebookContacts: Contact[] = [
 ];
 
 // Service functions
+// Remi default friend data
+const remiData: Contact = {
+  id: "remi-default-friend",
+  name: "Remi",
+  email: "remi@reminisce.app",
+  source: "reminisce",
+  avatar: "/remi-logo-purple.png",
+  hasAccount: true,
+  connectionStatus: "connected",
+  bio: "Hi there! I'm Remi, your guide to Reminisce. I'll help you navigate the app and show you how to connect with old friends. Feel free to explore our shared memories or message me if you have any questions!",
+};
+
 export const contactService = {
   /**
    * Get contacts from phone (mock implementation)
@@ -155,6 +168,81 @@ export const contactService = {
     return new Promise((resolve) => {
       setTimeout(() => resolve([]), 1200);
     });
+  },
+
+  /**
+   * Add Remi as a default friend for a new user
+   */
+  addRemiDefaultFriend: async (userId: string): Promise<boolean> => {
+    try {
+      // Check if Remi already exists as a contact for this user
+      const { data: existingRemi, error: checkError } = await supabase
+        .from("contacts")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("name", "Remi")
+        .single();
+
+      // If Remi already exists for this user, return true
+      if (existingRemi) {
+        return true;
+      }
+
+      // Get Remi's system user ID
+      const { data: remiUser, error: remiUserError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", remiData.email)
+        .single();
+
+      if (remiUserError) {
+        console.error("Error finding Remi system user:", remiUserError);
+        return false;
+      }
+
+      const remiUserId = remiUser?.id || remiData.id;
+
+      // Create Remi contact for the user
+      const { error } = await supabase.from("contacts").insert([
+        {
+          name: remiData.name,
+          email: remiData.email,
+          avatar: remiData.avatar,
+          source: remiData.source,
+          has_account: remiData.hasAccount,
+          connection_status: remiData.connectionStatus,
+          user_id: userId,
+          contact_user_id: remiUserId, // Link to the actual Remi user
+        },
+      ]);
+
+      if (error) {
+        console.error("Error adding Remi as default friend:", error);
+        return false;
+      }
+
+      // Create a connection record
+      const { error: connectionError } = await supabase
+        .from("connections")
+        .insert([
+          {
+            user_id: userId,
+            friend_id: remiUserId,
+            status: "connected",
+            first_met_context: "Remi is your guide to Reminisce!",
+          },
+        ]);
+
+      if (connectionError) {
+        console.error("Error creating connection with Remi:", connectionError);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error in addRemiDefaultFriend:", error);
+      return false;
+    }
   },
 
   getAllContacts: async (): Promise<Contact[]> => {

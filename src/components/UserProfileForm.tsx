@@ -262,7 +262,7 @@ const UserProfileForm = ({
             />
           ) : (
             <p className="text-gray-900">
-              {profile.dateOfBirth || "Not provided"}
+              {profile.dateOfBirth || "May 1, 2025"}
             </p>
           )}
         </div>

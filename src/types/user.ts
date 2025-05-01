@@ -43,10 +43,12 @@ export interface Contact {
     | "facebook"
     | "twitter"
     | "linkedin"
-    | "instagram";
+    | "instagram"
+    | "reminisce";
   avatar?: string;
   hasAccount: boolean;
   connectionStatus?: "connected" | "pending" | "not_connected";
+  bio?: string;
   // Shared memories
   sharedMemories?: import("./memory").Memory[];
 }

@@ -7,9 +7,13 @@ import "@fontsource/nunito/400.css";
 import "@fontsource/nunito/700.css";
 import "@fontsource/nunito/800.css";
 import routes from "tempo-routes";
-
 import { TempoDevtools } from "tempo-devtools";
+import { ensureRemiExists } from "./utils/remiUtils";
+
 TempoDevtools.init();
+
+// Initialize the app
+ensureRemiExists().catch(console.error);
 
 // Create a wrapper component to handle Tempo routes
 function AppWithTempoRoutes() {

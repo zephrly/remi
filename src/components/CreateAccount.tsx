@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { supabase } from "../lib/supabase";
+import { contactService } from "../services/contactService";
 import Logo from "./Logo";
 
 export default function CreateAccount() {
@@ -119,6 +120,9 @@ export default function CreateAccount() {
         if (profileError) {
           throw profileError;
         }
+
+        // Add Remi as a default friend
+        await contactService.addRemiDefaultFriend(data.user.id);
 
         // Redirect to onboarding flow after successful account creation
         navigate("/onboarding/dob");
