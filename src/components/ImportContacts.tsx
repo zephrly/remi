@@ -15,7 +15,7 @@ import {
   Linkedin,
 } from "lucide-react";
 
-// Replace react-facebook-login with a mock implementation
+// Mock implementation of Facebook login component
 const FacebookLogin = ({ callback }: { callback: (response: any) => void }) => {
   const handleFacebookLogin = () => {
     // Mock successful response
