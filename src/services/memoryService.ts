@@ -10,17 +10,17 @@ export async function getUserMemories(userId: string) {
       .select(
         `
         id,
-        user_id:userId,
+        user_id,
         prompt,
-        content,
-        created_at:createdAt,
-        tags:memory_tags(id, user_id:userId, users(id, name)),
-        photos:memory_photos(id, photo_url:photoUrl),
-        comments:memory_comments(id, user_id:userId, content, created_at:createdAt, users(name, avatar))
+        memory_text,
+        created_at,
+        tags:memory_tags(id, user_id, users(id, name)),
+        photos:memory_photos(id, photo_url),
+        comments:memory_comments(id, user_id, content, created_at, users(name, avatar))
       `,
       )
-      .or(`userId.eq.${userId},tags.userId.eq.${userId}`)
-      .order("createdAt", { ascending: false });
+      .or(`user_id.eq.${userId},tags.user_id.eq.${userId}`)
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
 
@@ -119,14 +119,14 @@ export async function getUserMemories(userId: string) {
       id: item.id,
       userId: item.user_id,
       prompt: item.prompt,
-      content: item.content,
+      content: item.memory_text, // Map memory_text to content in our interface
       createdAt: item.created_at,
       tags: item.tags?.map((tag: any) => ({
         id: tag.id,
-        user: tag.user
+        user: tag.users
           ? {
-              id: tag.user.id,
-              name: tag.user.name,
+              id: tag.users.id,
+              name: tag.users.name,
             }
           : undefined,
       })),
@@ -139,10 +139,10 @@ export async function getUserMemories(userId: string) {
         userId: comment.user_id,
         content: comment.content,
         createdAt: comment.created_at,
-        user: comment.user
+        user: comment.users
           ? {
-              name: comment.user.name,
-              avatar: comment.user.avatar,
+              name: comment.users.name,
+              avatar: comment.users.avatar,
             }
           : undefined,
       })),
@@ -163,7 +163,7 @@ export async function createMemory(memory: Omit<Memory, "id" | "createdAt">) {
       .insert({
         user_id: memory.userId,
         prompt: memory.prompt,
-        content: memory.content,
+        memory_text: memory.content, // Changed from content to memory_text to match DB schema
       })
       .select("id");
 
