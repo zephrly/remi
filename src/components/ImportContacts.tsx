@@ -14,6 +14,7 @@ import {
   Instagram,
   Linkedin,
 } from "lucide-react";
+// @ts-ignore - Ignoring type issues with react-facebook-login and React 18
 import FacebookLogin from "react-facebook-login";
 
 const ImportContacts: React.FC = () => {
