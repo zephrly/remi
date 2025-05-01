@@ -1,32 +1,6 @@
 import { supabase } from "@/lib/supabase";
 
-export interface Memory {
-  id: string;
-  userId: string;
-  prompt: string;
-  content: string;
-  createdAt: string;
-  tags?: {
-    id: string;
-    user?: {
-      id: string;
-      name: string;
-    };
-  }[];
-  photos?: {
-    id: string;
-    photoUrl: string;
-  }[];
-  comments?: {
-    id: string;
-    userId: string;
-    content: string;
-    createdAt: string;
-    user?: {
-      name: string;
-    };
-  }[];
-}
+import { Memory } from "@/types/memory";
 
 export async function getUserMemories(userId: string) {
   try {
@@ -36,13 +10,13 @@ export async function getUserMemories(userId: string) {
       .select(
         `
         id,
-        userId,
+        user_id:userId,
         prompt,
         content,
-        createdAt,
-        tags:memory_tags(id, userId, users(id, name)),
-        photos:memory_photos(id, photoUrl),
-        comments:memory_comments(id, userId, content, createdAt, users(name, avatar))
+        created_at:createdAt,
+        tags:memory_tags(id, user_id:userId, users(id, name)),
+        photos:memory_photos(id, photo_url:photoUrl),
+        comments:memory_comments(id, user_id:userId, content, created_at:createdAt, users(name, avatar))
       `,
       )
       .or(`userId.eq.${userId},tags.userId.eq.${userId}`)
@@ -140,7 +114,41 @@ export async function getUserMemories(userId: string) {
       };
     }
 
-    return { memories: (data as Memory[]) || [], error: null };
+    // Transform the data to match the Memory interface
+    const transformedData = data?.map((item: any) => ({
+      id: item.id,
+      userId: item.user_id,
+      prompt: item.prompt,
+      content: item.content,
+      createdAt: item.created_at,
+      tags: item.tags?.map((tag: any) => ({
+        id: tag.id,
+        user: tag.user
+          ? {
+              id: tag.user.id,
+              name: tag.user.name,
+            }
+          : undefined,
+      })),
+      photos: item.photos?.map((photo: any) => ({
+        id: photo.id,
+        photoUrl: photo.photo_url,
+      })),
+      comments: item.comments?.map((comment: any) => ({
+        id: comment.id,
+        userId: comment.user_id,
+        content: comment.content,
+        createdAt: comment.created_at,
+        user: comment.user
+          ? {
+              name: comment.user.name,
+              avatar: comment.user.avatar,
+            }
+          : undefined,
+      })),
+    }));
+
+    return { memories: (transformedData as Memory[]) || [], error: null };
   } catch (error) {
     console.error("Error fetching memories:", error);
     return { memories: [], error };
@@ -153,7 +161,7 @@ export async function createMemory(memory: Omit<Memory, "id" | "createdAt">) {
     const { data, error } = await supabase
       .from("memories")
       .insert({
-        userId: memory.userId,
+        user_id: memory.userId,
         prompt: memory.prompt,
         content: memory.content,
       })
@@ -165,8 +173,8 @@ export async function createMemory(memory: Omit<Memory, "id" | "createdAt">) {
     // Insert tags if any
     if (memory.tags && memory.tags.length > 0) {
       const tagInserts = memory.tags.map((tag) => ({
-        memoryId,
-        userId: tag.user?.id,
+        memory_id: memoryId,
+        user_id: tag.user?.id,
       }));
 
       const { error: tagError } = await supabase
@@ -179,8 +187,8 @@ export async function createMemory(memory: Omit<Memory, "id" | "createdAt">) {
     // Insert photos if any
     if (memory.photos && memory.photos.length > 0) {
       const photoInserts = memory.photos.map((photo) => ({
-        memoryId,
-        photoUrl: photo.photoUrl,
+        memory_id: memoryId,
+        photo_url: photo.photoUrl,
       }));
 
       const { error: photoError } = await supabase

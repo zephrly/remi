@@ -48,5 +48,5 @@ export interface Contact {
   hasAccount: boolean;
   connectionStatus?: "connected" | "pending" | "not_connected";
   // Shared memories
-  sharedMemories?: Memory[];
+  sharedMemories?: import("./memory").Memory[];
 }
