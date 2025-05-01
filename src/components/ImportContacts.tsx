@@ -14,8 +14,26 @@ import {
   Instagram,
   Linkedin,
 } from "lucide-react";
-// @ts-ignore - Ignoring type issues with react-facebook-login and React 18
-import FacebookLogin from "react-facebook-login";
+
+// Replace react-facebook-login with a mock implementation
+const FacebookLogin = ({ callback }: { callback: (response: any) => void }) => {
+  const handleFacebookLogin = () => {
+    // Mock successful response
+    callback({
+      accessToken: "mock_access_token",
+      userID: "mock_user_id",
+      name: "Mock User",
+      email: "mock@example.com",
+    });
+  };
+
+  return (
+    <Button onClick={handleFacebookLogin}>
+      <Facebook className="mr-2 h-4 w-4" />
+      Connect Facebook
+    </Button>
+  );
+};
 
 const ImportContacts: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("phone");
@@ -90,8 +108,8 @@ const ImportContacts: React.FC = () => {
     }
   };
 
-  const handleFacebookLogin = () => {
-    // Simulate successful Facebook login
+  const handleFacebookLogin = (response: any) => {
+    // Handle Facebook login response
     setLoading((prev) => ({ ...prev, facebook: true }));
 
     // In a real implementation, this would use the Facebook SDK
@@ -190,22 +208,7 @@ const ImportContacts: React.FC = () => {
               {!connected[service as keyof typeof connected] ? (
                 <div className="text-center py-8">
                   {service === "facebook" ? (
-                    <Button
-                      onClick={handleFacebookLogin}
-                      disabled={loading.facebook}
-                    >
-                      {loading.facebook ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Connecting...
-                        </>
-                      ) : (
-                        <>
-                          <Facebook className="mr-2 h-4 w-4" />
-                          Connect Facebook
-                        </>
-                      )}
-                    </Button>
+                    <FacebookLogin callback={handleFacebookLogin} />
                   ) : (
                     <Button
                       onClick={() =>
