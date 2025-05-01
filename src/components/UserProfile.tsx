@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import UserProfileForm from "./UserProfileForm";
+import { useAvatarUpload } from "../hooks/useAvatarUpload";
 
 interface UserProfileProps {
   onBack?: () => void;
@@ -50,7 +51,7 @@ const UserProfile = ({
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState(currentUser);
   const [loading, setLoading] = useState(true);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const { uploadAvatar, uploadingAvatar } = useAvatarUpload();
 
   // Fetch user profile data from Supabase
   useEffect(() => {
@@ -203,45 +204,32 @@ const UserProfile = ({
   const handleAvatarChange = async (file?: File) => {
     if (!file) return;
 
-    setUploadingAvatar(true);
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      console.log("Starting avatar upload for file:", file.name);
 
-      if (!session) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "You must be logged in to update your avatar.",
-        });
+      const { publicUrl } = await uploadAvatar(file);
+
+      if (!publicUrl) {
+        console.error("No public URL returned from upload");
         return;
       }
 
-      // Generate a unique file name
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
-      // Upload the file to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from("profile-images")
-        .upload(filePath, file);
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Get the public URL for the uploaded file
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("profile-images").getPublicUrl(filePath);
+      console.log("Upload successful, public URL:", publicUrl);
 
       // Update the profile with the new avatar URL
       setProfile((prev) => ({
         ...prev,
         avatar: publicUrl,
       }));
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        console.error("No session found when updating profile");
+        return;
+      }
 
       // Save the avatar URL to the user's profile in the database
       const { error: updateError } = await supabase
@@ -250,6 +238,7 @@ const UserProfile = ({
         .eq("id", session.user.id);
 
       if (updateError) {
+        console.error("Error updating profile with new avatar:", updateError);
         throw updateError;
       }
 
@@ -258,14 +247,12 @@ const UserProfile = ({
         description: "Profile picture updated successfully.",
       });
     } catch (error: any) {
-      console.error("Error uploading avatar:", error);
+      console.error("Error in handleAvatarChange:", error);
       toast({
         variant: "destructive",
         title: "Error",
         description: error.message || "Failed to upload profile picture.",
       });
-    } finally {
-      setUploadingAvatar(false);
     }
   };
 

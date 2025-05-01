@@ -92,6 +92,7 @@ const UserProfileForm = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0] && handleAvatarChange) {
+      console.log("File selected:", e.target.files[0].name);
       handleAvatarChange(e.target.files[0]);
     }
   };
@@ -147,6 +148,7 @@ const UserProfileForm = ({
                 className="hidden"
                 accept="image/*"
                 onChange={handleFileChange}
+                aria-label="Upload profile picture"
               />
               <Button
                 variant="secondary"

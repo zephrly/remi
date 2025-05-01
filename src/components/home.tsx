@@ -2,8 +2,6 @@ import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Bell, Mail, User, Search, Menu, UserCircle } from "lucide-react";
-import Logo from "./Logo";
 import DiscoveryFeed from "./DiscoveryFeed";
 import ImportContacts from "./ImportContacts";
 import MessagesPanel from "./MessagesPanel";
@@ -12,6 +10,7 @@ import ReminiscePanel from "./ReminiscePanel";
 import ReminisceList from "./ReminisceList";
 import UserProfile from "./UserProfile";
 import Memories from "./Memories";
+import NavigationHeader from "./NavigationHeader";
 
 interface ConnectionRequest {
   id: string;
@@ -82,83 +81,13 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center">
-            <Logo className="h-8 mr-8" />
-            <nav className="hidden md:flex space-x-6">
-              <button
-                onClick={() => {
-                  setActiveMainTab("discover");
-                  setActiveDiscoverSubTab("discover");
-                }}
-                className={`${activeMainTab === "discover" ? "text-primary font-medium" : "text-gray-600 hover:text-primary"}`}
-              >
-                Discover
-              </button>
-              <button
-                onClick={() => {
-                  setActiveMainTab("connections");
-                  setActiveConnectionsSubTab("connections");
-                }}
-                className={`${activeMainTab === "connections" ? "text-primary font-medium" : "text-gray-600 hover:text-primary"}`}
-              >
-                Connections
-              </button>
-              <button
-                onClick={() => {
-                  setActiveMainTab("connections");
-                  setActiveConnectionsSubTab("messages");
-                }}
-                className={`${activeMainTab === "connections" && activeConnectionsSubTab === "messages" ? "text-primary font-medium" : "text-gray-600 hover:text-primary"}`}
-              >
-                Messages
-              </button>
-              <button
-                onClick={() => setActiveMainTab("memories")}
-                className={`${activeMainTab === "memories" ? "text-primary font-medium" : "text-gray-600 hover:text-primary"}`}
-              >
-                Memories
-              </button>
-              <button
-                onClick={() => setActiveMainTab("profile")}
-                className={`${activeMainTab === "profile" ? "text-primary font-medium" : "text-gray-600 hover:text-primary"}`}
-              >
-                Profile
-              </button>
-            </nav>
-          </div>
-
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative"
-              onClick={() => setActiveMainTab("requests")}
-            >
-              <Bell size={20} />
-              {connectionRequests.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {connectionRequests.length}
-                </span>
-              )}
-            </Button>
-            <Button variant="ghost" size="icon">
-              <Search size={20} />
-            </Button>
-            <Avatar className="h-8 w-8">
-              <AvatarImage
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=user"
-                alt="User"
-              />
-              <AvatarFallback>U</AvatarFallback>
-            </Avatar>
-            <Button variant="ghost" size="icon" className="md:hidden">
-              <Menu size={20} />
-            </Button>
-          </div>
-        </div>
-      </header>
+      <NavigationHeader
+        activeMainTab={activeMainTab}
+        setActiveMainTab={setActiveMainTab}
+        setActiveDiscoverSubTab={setActiveDiscoverSubTab}
+        setActiveConnectionsSubTab={setActiveConnectionsSubTab}
+        connectionRequestsCount={connectionRequests.length}
+      />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
