@@ -14,26 +14,7 @@ import {
   Instagram,
   Linkedin,
 } from "lucide-react";
-
-// Mock implementation of Facebook login component
-const FacebookLogin = ({ callback }: { callback: (response: any) => void }) => {
-  const handleFacebookLogin = () => {
-    // Mock successful response
-    callback({
-      accessToken: "mock_access_token",
-      userID: "mock_user_id",
-      name: "Mock User",
-      email: "mock@example.com",
-    });
-  };
-
-  return (
-    <Button onClick={handleFacebookLogin}>
-      <Facebook className="mr-2 h-4 w-4" />
-      Connect Facebook
-    </Button>
-  );
-};
+import FacebookLogin from "./FacebookLogin";
 
 const ImportContacts: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("phone");
