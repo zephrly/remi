@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { BrowserRouter, useRoutes } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useRoutes } from "react-router-dom";
 import "@fontsource/nunito/400.css";
 import "@fontsource/nunito/700.css";
 import "@fontsource/nunito/800.css";
@@ -11,9 +11,9 @@ import routes from "tempo-routes";
 import { TempoDevtools } from "tempo-devtools";
 TempoDevtools.init();
 
-// Create a wrapper component to handle Tempo routes
+// Define the component outside of the render function
 function AppWithTempoRoutes() {
-  // Use the tempo routes if in Tempo environment
+  // Use the useRoutes hook conditionally inside a component
   const tempoRoutes =
     import.meta.env.VITE_TEMPO === "true" ? useRoutes(routes) : null;
 
