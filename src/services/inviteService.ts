@@ -1,5 +1,6 @@
 import { Contact } from "../types/user";
 import { supabase } from "../lib/supabase";
+import { InviteLink, Connection } from "../types/database";
 
 // Service functions for handling invites
 export const inviteService = {
@@ -66,13 +67,11 @@ export const inviteService = {
     const uniqueCode = Math.random().toString(36).substring(2, 10);
 
     // Store the invite link in the database
-    const { error } = await supabase.from("invite_links").insert([
-      {
-        code: uniqueCode,
-        user_id: user.id,
-        created_at: new Date().toISOString(),
-      },
-    ]);
+    const { error } = await supabase.from("invite_links").insert({
+      code: uniqueCode,
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+    });
 
     if (error) {
       console.error("Error creating invite link:", error);
@@ -107,14 +106,12 @@ export const inviteService = {
       // Create a connection between the users
       const { error: connectionError } = await supabase
         .from("connections")
-        .insert([
-          {
-            user_id: inviteData.user_id,
-            connected_user_id: newUserId,
-            status: "connected",
-            created_at: new Date().toISOString(),
-          },
-        ]);
+        .insert({
+          user_id: inviteData.user_id,
+          friend_id: newUserId,
+          status: "connected",
+          created_at: new Date().toISOString(),
+        });
 
       if (connectionError) {
         console.error("Error creating connection:", connectionError);

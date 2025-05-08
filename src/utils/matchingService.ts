@@ -11,13 +11,7 @@ interface UserInterest {
   theirInterestLevel?: number;
 }
 
-interface UserRating {
-  user_id: string;
-  rated_user_id: string;
-  interest_level: number;
-  created_at: string;
-  updated_at: string;
-}
+import { UserRating } from "@/types/database";
 
 interface MessageSession {
   sessionId: string;

@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { supabase } from "@/lib/supabase";
+import { UserRating } from "@/types/database";
 
 interface Friend {
   id: string;
