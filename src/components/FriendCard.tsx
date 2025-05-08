@@ -67,7 +67,7 @@ const FriendCard: React.FC<FriendCardProps> = ({
 
       // Check if a rating already exists
       const { data: existingRating, error: fetchError } = await supabase
-        .from("user_ratings")
+        .from("user_ratings" as any)
         .select()
         .eq("user_id", userId)
         .eq("rated_user_id", friend.id)
@@ -85,7 +85,7 @@ const FriendCard: React.FC<FriendCardProps> = ({
       if (existingRating) {
         // Update existing rating
         const { error: updateError } = await supabase
-          .from("user_ratings")
+          .from("user_ratings" as any)
           .update({
             interest_level: level,
             updated_at: new Date().toISOString(),
@@ -100,7 +100,7 @@ const FriendCard: React.FC<FriendCardProps> = ({
       } else {
         // Insert new rating
         const { error: insertError } = await supabase
-          .from("user_ratings")
+          .from("user_ratings" as any)
           .insert({
             user_id: userId,
             rated_user_id: friend.id,

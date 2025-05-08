@@ -26,6 +26,24 @@ export interface Connection {
   updated_at?: string;
 }
 
+// Define all table names for type safety
+export type TableName =
+  | "users"
+  | "memories"
+  | "connection_requests"
+  | "connections"
+  | "contacts"
+  | "memory_comments"
+  | "memory_photos"
+  | "memory_tags"
+  | "message_sessions"
+  | "messages"
+  | "notifications"
+  | "profiles"
+  | "timeline_events"
+  | "user_ratings"
+  | "invite_links";
+
 // Type-safe table names
 export type Tables = {
   user_ratings: UserRating;

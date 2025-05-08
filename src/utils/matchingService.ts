@@ -128,7 +128,7 @@ export const loadUserRatingsFromSupabase = async (
   try {
     // Get ratings made by the current user
     const { data: outgoingRatings, error: outgoingError } = await supabase
-      .from("user_ratings")
+      .from("user_ratings" as any)
       .select()
       .eq("user_id", userId);
 
@@ -139,7 +139,7 @@ export const loadUserRatingsFromSupabase = async (
 
     // Get ratings made about the current user
     const { data: incomingRatings, error: incomingError } = await supabase
-      .from("user_ratings")
+      .from("user_ratings" as any)
       .select()
       .eq("rated_user_id", userId);
 
