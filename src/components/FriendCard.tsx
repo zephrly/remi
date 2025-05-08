@@ -66,12 +66,12 @@ const FriendCard: React.FC<FriendCardProps> = ({
       const userId = userData.user.id;
 
       // Check if a rating already exists
-      const { data: existingRating, error: fetchError } = await supabase
-        .from("user_ratings" as any)
-        .select()
-        .eq("user_id", userId)
-        .eq("rated_user_id", friend.id)
-        .single();
+      const { data: existingRating, error: fetchError } =
+        await supabase.userRatings
+          .select()
+          .eq("user_id", userId)
+          .eq("rated_user_id", friend.id)
+          .single();
 
       if (fetchError && fetchError.code !== "PGRST116") {
         // PGRST116 is the error code for no rows returned
@@ -84,8 +84,7 @@ const FriendCard: React.FC<FriendCardProps> = ({
 
       if (existingRating) {
         // Update existing rating
-        const { error: updateError } = await supabase
-          .from("user_ratings" as any)
+        const { error: updateError } = await supabase.userRatings
           .update({
             interest_level: level,
             updated_at: new Date().toISOString(),
@@ -99,14 +98,12 @@ const FriendCard: React.FC<FriendCardProps> = ({
         }
       } else {
         // Insert new rating
-        const { error: insertError } = await supabase
-          .from("user_ratings" as any)
-          .insert({
-            user_id: userId,
-            rated_user_id: friend.id,
-            interest_level: level,
-            created_at: new Date().toISOString(),
-          });
+        const { error: insertError } = await supabase.userRatings.insert({
+          user_id: userId,
+          rated_user_id: friend.id,
+          interest_level: level,
+          created_at: new Date().toISOString(),
+        });
 
         if (insertError) {
           console.error("Error inserting rating:", insertError);

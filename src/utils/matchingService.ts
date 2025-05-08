@@ -127,10 +127,8 @@ export const loadUserRatingsFromSupabase = async (
 ): Promise<UserInterest[]> => {
   try {
     // Get ratings made by the current user
-    const { data: outgoingRatings, error: outgoingError } = await supabase
-      .from("user_ratings" as any)
-      .select()
-      .eq("user_id", userId);
+    const { data: outgoingRatings, error: outgoingError } =
+      await supabase.userRatings.select().eq("user_id", userId);
 
     if (outgoingError) {
       console.error("Error fetching outgoing ratings:", outgoingError);
@@ -138,10 +136,8 @@ export const loadUserRatingsFromSupabase = async (
     }
 
     // Get ratings made about the current user
-    const { data: incomingRatings, error: incomingError } = await supabase
-      .from("user_ratings" as any)
-      .select()
-      .eq("rated_user_id", userId);
+    const { data: incomingRatings, error: incomingError } =
+      await supabase.userRatings.select().eq("rated_user_id", userId);
 
     if (incomingError) {
       console.error("Error fetching incoming ratings:", incomingError);

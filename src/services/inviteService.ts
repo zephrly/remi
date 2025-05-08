@@ -67,7 +67,7 @@ export const inviteService = {
     const uniqueCode = Math.random().toString(36).substring(2, 10);
 
     // Store the invite link in the database
-    const { error } = await supabase.from("invite_links" as any).insert({
+    const { error } = await supabase.inviteLinks.insert({
       code: uniqueCode,
       user_id: user.id,
       created_at: new Date().toISOString(),
@@ -93,11 +93,8 @@ export const inviteService = {
   ): Promise<boolean> => {
     try {
       // Find the invite link in the database
-      const { data: inviteData, error: inviteError } = await supabase
-        .from("invite_links" as any)
-        .select()
-        .eq("code", inviteCode)
-        .single();
+      const { data: inviteData, error: inviteError } =
+        await supabase.inviteLinks.select().eq("code", inviteCode).single();
 
       if (inviteError || !inviteData) {
         console.error("Error finding invite link:", inviteError);
@@ -108,14 +105,12 @@ export const inviteService = {
       const typedInviteData = inviteData as InviteLink;
 
       // Create a connection between the users
-      const { error: connectionError } = await supabase
-        .from("connections" as any)
-        .insert({
-          user_id: typedInviteData.user_id,
-          friend_id: newUserId,
-          status: "connected",
-          created_at: new Date().toISOString(),
-        });
+      const { error: connectionError } = await supabase.connections.insert({
+        user_id: typedInviteData.user_id,
+        friend_id: newUserId,
+        status: "connected",
+        created_at: new Date().toISOString(),
+      });
 
       if (connectionError) {
         console.error("Error creating connection:", connectionError);
