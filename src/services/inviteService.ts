@@ -67,10 +67,11 @@ export const inviteService = {
     const uniqueCode = Math.random().toString(36).substring(2, 10);
 
     // Store the invite link in the database
-    const { error } = await supabase.from<InviteLink>("invite_links").insert({
+    const { error } = await supabase.from("invite_links").insert({
       code: uniqueCode,
       user_id: user.id,
       created_at: new Date().toISOString(),
+      used: false,
     });
 
     if (error) {
@@ -93,7 +94,7 @@ export const inviteService = {
     try {
       // Find the invite link in the database
       const { data: inviteData, error: inviteError } = await supabase
-        .from<InviteLink>("invite_links")
+        .from("invite_links")
         .select("user_id")
         .eq("code", inviteCode)
         .single();
@@ -105,7 +106,7 @@ export const inviteService = {
 
       // Create a connection between the users
       const { error: connectionError } = await supabase
-        .from<Connection>("connections")
+        .from("connections")
         .insert({
           user_id: inviteData.user_id,
           friend_id: newUserId,

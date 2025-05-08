@@ -1,10 +1,12 @@
+// Define the database schema types for Supabase
+
 export interface UserRating {
   id: string;
   user_id: string;
   rated_user_id: string;
   interest_level: number;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 export interface InviteLink {
@@ -21,5 +23,12 @@ export interface Connection {
   friend_id: string;
   status: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
+
+// Type-safe table names
+export type Tables = {
+  user_ratings: UserRating;
+  invite_links: InviteLink;
+  connections: Connection;
+};
