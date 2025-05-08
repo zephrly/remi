@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { supabase } from "../lib/supabase";
 import Logo from "./Logo";
+import { inviteService } from "../services/inviteService";
 
 export default function CreateAccount() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -18,6 +20,18 @@ export default function CreateAccount() {
   const [username, setUsername] = useState("");
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+
+  // Extract invite code from URL if present
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+
+  // Extract invite code from URL parameters
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const code = queryParams.get("invite");
+    if (code) {
+      setInviteCode(code);
+    }
+  }, [location]);
 
   // Check username availability when it changes
   useEffect(() => {
@@ -118,6 +132,16 @@ export default function CreateAccount() {
 
         if (profileError) {
           throw profileError;
+        }
+
+        // If there's an invite code, process it to connect users
+        if (inviteCode) {
+          try {
+            await inviteService.processInviteLink(inviteCode, data.user.id);
+          } catch (connectionError) {
+            console.error("Error processing invite link:", connectionError);
+            // Continue with account creation even if connection fails
+          }
         }
 
         // Redirect to onboarding flow after successful account creation

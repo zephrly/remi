@@ -9,6 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +23,13 @@ import {
   Users,
 } from "lucide-react";
 import FriendCard from "../components/FriendCard";
+import { supabase } from "@/lib/supabase";
+import {
+  loadUserRatingsFromSupabase,
+  calculateMatchScore,
+  isMatch,
+  getUserMatchesFromSupabase,
+} from "@/utils/matchingService";
 
 interface DiscoveryFeedProps {
   friends?: Friend[];
@@ -168,6 +177,148 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
   const [activeTab, setActiveTab] = useState(view);
   const [yearRange, setYearRange] = useState([2000, 2023]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [friendsWithRatings, setFriendsWithRatings] =
+    useState<Friend[]>(friends);
+  const [connectionsWithRatings, setConnectionsWithRatings] =
+    useState<Friend[]>(connections);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [showOnlyMatches, setShowOnlyMatches] = useState(false);
+  const [filteredFriends, setFilteredFriends] = useState<Friend[]>(friends);
+
+  // Get current user and load ratings from Supabase
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) {
+        console.error("Error fetching current user:", error);
+        return;
+      }
+      setCurrentUserId(data.user.id);
+    };
+
+    fetchCurrentUser();
+  }, []);
+
+  // Filter friends based on match status and search query
+  useEffect(() => {
+    let filtered = [...friendsWithRatings];
+
+    // Apply search filter if query exists
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (friend) =>
+          friend.name.toLowerCase().includes(query) ||
+          friend.overlapPlaces?.some((place) =>
+            place.toLowerCase().includes(query),
+          ) ||
+          friend.memories?.some((memory) =>
+            memory.toLowerCase().includes(query),
+          ),
+      );
+    }
+
+    // Apply match filter if enabled
+    if (showOnlyMatches) {
+      filtered = filtered.filter((friend) => friend.isMatch === true);
+    }
+
+    setFilteredFriends(filtered);
+
+    // Reset current index when filters change
+    if (filtered.length > 0 && currentIndex >= filtered.length) {
+      setCurrentIndex(0);
+    }
+  }, [friendsWithRatings, searchQuery, showOnlyMatches, currentIndex]);
+
+  // Load ratings when user ID is available
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const loadRatings = async () => {
+      try {
+        const userRatings = await loadUserRatingsFromSupabase(currentUserId);
+        console.log("Loaded user ratings from Supabase:", userRatings);
+
+        // Update friends with ratings
+        const updatedFriends = friends.map((friend) => {
+          const ratingData = userRatings.find(
+            (rating) => rating.id === friend.id,
+          );
+          if (ratingData) {
+            const matchScore = calculateMatchScore(
+              ratingData.interestLevel,
+              ratingData.theirInterestLevel,
+            );
+
+            return {
+              ...friend,
+              interestLevel: ratingData.interestLevel,
+              theirInterestLevel: ratingData.theirInterestLevel,
+              matchScore: matchScore,
+              isMatch: isMatch(
+                ratingData.interestLevel,
+                ratingData.theirInterestLevel,
+              ),
+            };
+          }
+          return friend;
+        });
+
+        // Update connections with ratings
+        const updatedConnections = connections.map((connection) => {
+          const ratingData = userRatings.find(
+            (rating) => rating.id === connection.id,
+          );
+          if (ratingData) {
+            const matchScore = calculateMatchScore(
+              ratingData.interestLevel,
+              ratingData.theirInterestLevel,
+            );
+
+            return {
+              ...connection,
+              interestLevel: ratingData.interestLevel,
+              theirInterestLevel: ratingData.theirInterestLevel,
+              matchScore: matchScore,
+              isMatch: isMatch(
+                ratingData.interestLevel,
+                ratingData.theirInterestLevel,
+              ),
+            };
+          }
+          return connection;
+        });
+
+        setFriendsWithRatings(updatedFriends);
+        setConnectionsWithRatings(updatedConnections);
+
+        // Load matches from Supabase
+        if (currentUserId) {
+          try {
+            const matchIds = await getUserMatchesFromSupabase(currentUserId);
+            console.log("Loaded matches from Supabase:", matchIds);
+
+            // Filter friends to show only matches
+            const matchedFriends = updatedFriends.filter(
+              (friend) =>
+                matchIds.includes(friend.id) || friend.isMatch === true,
+            );
+
+            console.log("Matched friends:", matchedFriends);
+
+            // You can use matchedFriends for the matches tab or other UI elements
+          } catch (error) {
+            console.error("Error loading matches:", error);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading ratings:", error);
+      }
+    };
+
+    loadRatings();
+  }, [currentUserId, friends, connections]);
 
   useEffect(() => {
     const handleSetTab = (event: CustomEvent) => {
@@ -184,7 +335,7 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
     };
   }, []);
 
-  const matches = [
+  const [matches, setMatches] = useState([
     {
       id: "1",
       name: "Sarah Johnson",
@@ -201,10 +352,70 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
       mutualConnections: 5,
       matchScore: 92,
     },
-  ];
+  ]);
+
+  // Load matches when user ID is available
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const loadMatches = async () => {
+      try {
+        // Get all user ratings
+        const userRatings = await loadUserRatingsFromSupabase(currentUserId);
+
+        // Filter to only include matches (mutual high interest)
+        const matchedRatings = userRatings.filter((rating) =>
+          isMatch(rating.interestLevel, rating.theirInterestLevel),
+        );
+
+        if (matchedRatings.length === 0) return;
+
+        // Get user details for each match
+        const matchedUsers = [];
+
+        for (const rating of matchedRatings) {
+          const { data: userData, error } = await supabase
+            .from("users")
+            .select("*")
+            .eq("id", rating.id)
+            .single();
+
+          if (error) {
+            console.error("Error fetching match user data:", error);
+            continue;
+          }
+
+          if (userData) {
+            const matchScore = calculateMatchScore(
+              rating.interestLevel,
+              rating.theirInterestLevel,
+            );
+
+            matchedUsers.push({
+              id: userData.id,
+              name: userData.name,
+              photo:
+                userData.avatar ||
+                `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.id}`,
+              mutualConnections: Math.floor(Math.random() * 5) + 1, // Placeholder
+              matchScore: matchScore,
+            });
+          }
+        }
+
+        if (matchedUsers.length > 0) {
+          setMatches(matchedUsers);
+        }
+      } catch (error) {
+        console.error("Error loading matches:", error);
+      }
+    };
+
+    loadMatches();
+  }, [currentUserId]);
 
   const handleNext = () => {
-    if (currentIndex < friends.length - 1) {
+    if (currentIndex < filteredFriends.length - 1) {
       setCurrentIndex(currentIndex + 1);
     }
   };
@@ -216,13 +427,17 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
   };
 
   const handleSendRequest = () => {
-    onSendRequest(friends[currentIndex].id);
-    handleNext();
+    if (filteredFriends.length > 0) {
+      onSendRequest(filteredFriends[currentIndex].id);
+      handleNext();
+    }
   };
 
   const handleSkip = () => {
-    onSkip(friends[currentIndex].id);
-    handleNext();
+    if (filteredFriends.length > 0) {
+      onSkip(filteredFriends[currentIndex].id);
+      handleNext();
+    }
   };
 
   const handleSubmitMemory = () => {
@@ -233,32 +448,31 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
   };
 
   const handleInterestLevelChange = (level: number) => {
+    if (filteredFriends.length === 0) return;
+
+    const currentFriend = filteredFriends[currentIndex];
     console.log(`Interest level for ${currentFriend.name}: ${level}`);
 
-    const updatedFriends = friends.map((friend, idx) => {
-      if (idx === currentIndex) {
+    // Find the index in the original friendsWithRatings array
+    const originalIndex = friendsWithRatings.findIndex(
+      (f) => f.id === currentFriend.id,
+    );
+    if (originalIndex === -1) return;
+
+    const updatedFriends = friendsWithRatings.map((friend, idx) => {
+      if (idx === originalIndex) {
         return { ...friend, interestLevel: level };
       }
       return friend;
     });
 
-    if (!updatedFriends[currentIndex].theirInterestLevel) {
-      updatedFriends[currentIndex].theirInterestLevel =
+    if (!updatedFriends[originalIndex].theirInterestLevel) {
+      updatedFriends[originalIndex].theirInterestLevel =
         Math.floor(Math.random() * 7) + 1;
     }
 
-    localStorage.setItem(
-      "friendInterestLevels",
-      JSON.stringify(
-        updatedFriends.map((f) => ({
-          id: f.id,
-          interestLevel: f.interestLevel,
-        })),
-      ),
-    );
+    setFriendsWithRatings(updatedFriends);
   };
-
-  const currentFriend = friends[currentIndex];
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 bg-background">
@@ -278,12 +492,25 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
+              <div className="flex items-center justify-end space-x-2 mt-2">
+                <Switch
+                  id="show-matches"
+                  checked={showOnlyMatches}
+                  onCheckedChange={setShowOnlyMatches}
+                />
+                <Label
+                  htmlFor="show-matches"
+                  className="text-sm cursor-pointer"
+                >
+                  Show only matches
+                </Label>
+              </div>
             </div>
 
             <div className="relative w-full max-w-md">
-              {friends.length > 0 ? (
+              {filteredFriends.length > 0 ? (
                 <FriendCard
-                  friend={currentFriend}
+                  friend={filteredFriends[currentIndex]}
                   onSendRequest={handleSendRequest}
                   onSkip={handleSkip}
                   onInterestLevelChange={handleInterestLevelChange}
@@ -292,8 +519,9 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
                 <Card className="w-full h-[550px] flex items-center justify-center">
                   <CardContent>
                     <p className="text-center text-muted-foreground">
-                      No potential connections found. Try adjusting your
-                      filters.
+                      {showOnlyMatches
+                        ? "No matches found. Try rating more people or check back later."
+                        : "No potential connections found. Try adjusting your filters."}
                     </p>
                   </CardContent>
                 </Card>
@@ -304,18 +532,23 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
                   variant="outline"
                   size="icon"
                   onClick={handlePrevious}
-                  disabled={currentIndex === 0}
+                  disabled={currentIndex === 0 || filteredFriends.length === 0}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <div className="text-sm text-muted-foreground">
-                  {currentIndex + 1} of {friends.length}
+                  {filteredFriends.length > 0
+                    ? `${currentIndex + 1} of ${filteredFriends.length}`
+                    : "0 of 0"}
                 </div>
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={handleNext}
-                  disabled={currentIndex === friends.length - 1}
+                  disabled={
+                    currentIndex === filteredFriends.length - 1 ||
+                    filteredFriends.length === 0
+                  }
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -364,7 +597,7 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
                   Recent Memory Prompts
                 </h4>
                 <div className="space-y-4">
-                  {friends
+                  {friendsWithRatings
                     .flatMap((friend) => friend.prompts || [])
                     .slice(0, 3)
                     .map((prompt, index) => (
@@ -399,12 +632,13 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
             </div>
 
             <div className="relative w-full max-w-md">
-              {connections.length > 0 ? (
+              {connectionsWithRatings.length > 0 ? (
                 <FriendCard
-                  friend={connections[currentConnectionIndex]}
+                  friend={connectionsWithRatings[currentConnectionIndex]}
                   connected={true}
                   onMessage={(friendId) => {
-                    const friend = connections[currentConnectionIndex];
+                    const friend =
+                      connectionsWithRatings[currentConnectionIndex];
                     console.log("Messaging friend:", friend);
                     console.log("Calling onSelectFriend with:", {
                       id: friend.id,
@@ -420,7 +654,8 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
                     onChangeTab("messages");
                   }}
                   onReminisce={() => {
-                    const friend = connections[currentConnectionIndex];
+                    const friend =
+                      connectionsWithRatings[currentConnectionIndex];
                     console.log(`Reminiscing with ${friend.name}`);
                     onSelectFriend({
                       id: friend.id,
@@ -456,19 +691,24 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <div className="text-sm text-muted-foreground">
-                  {connections.length > 0
-                    ? `${currentConnectionIndex + 1} of ${connections.length}`
+                  {connectionsWithRatings.length > 0
+                    ? `${currentConnectionIndex + 1} of ${connectionsWithRatings.length}`
                     : "0 of 0"}
                 </div>
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => {
-                    if (currentConnectionIndex < connections.length - 1) {
+                    if (
+                      currentConnectionIndex <
+                      connectionsWithRatings.length - 1
+                    ) {
                       setCurrentConnectionIndex(currentConnectionIndex + 1);
                     }
                   }}
-                  disabled={currentConnectionIndex === connections.length - 1}
+                  disabled={
+                    currentConnectionIndex === connectionsWithRatings.length - 1
+                  }
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>

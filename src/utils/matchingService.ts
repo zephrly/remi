@@ -3,11 +3,20 @@
  *
  * This service handles the logic for matching users based on their mutual interest levels.
  */
+import { supabase } from "@/lib/supabase";
 
 interface UserInterest {
   id: string;
   interestLevel?: number;
   theirInterestLevel?: number;
+}
+
+interface UserRating {
+  user_id: string;
+  rated_user_id: string;
+  interest_level: number;
+  created_at: string;
+  updated_at: string;
 }
 
 interface MessageSession {
@@ -87,6 +96,18 @@ export const getUserMatches = (
 };
 
 /**
+ * Gets all matches for a user from Supabase
+ * @param userId The current user's ID
+ * @returns Promise resolving to an array of user IDs that match with the current user
+ */
+export const getUserMatchesFromSupabase = async (
+  userId: string,
+): Promise<string[]> => {
+  const userInterests = await loadUserRatingsFromSupabase(userId);
+  return getUserMatches(userId, userInterests);
+};
+
+/**
  * Loads stored interest levels from localStorage
  * @returns Array of user interests
  */
@@ -98,6 +119,65 @@ export const loadStoredInterestLevels = (): UserInterest[] => {
     return JSON.parse(storedData);
   } catch (e) {
     console.error("Error parsing stored interest levels:", e);
+    return [];
+  }
+};
+
+/**
+ * Loads user ratings from Supabase
+ * @param userId The current user's ID
+ * @returns Promise resolving to an array of user interests
+ */
+export const loadUserRatingsFromSupabase = async (
+  userId: string,
+): Promise<UserInterest[]> => {
+  try {
+    // Get ratings made by the current user
+    const { data: outgoingRatings, error: outgoingError } = await supabase
+      .from("user_ratings")
+      .select("*")
+      .eq("user_id", userId);
+
+    if (outgoingError) {
+      console.error("Error fetching outgoing ratings:", outgoingError);
+      return [];
+    }
+
+    // Get ratings made about the current user
+    const { data: incomingRatings, error: incomingError } = await supabase
+      .from("user_ratings")
+      .select("*")
+      .eq("rated_user_id", userId);
+
+    if (incomingError) {
+      console.error("Error fetching incoming ratings:", incomingError);
+      return [];
+    }
+
+    // Combine the ratings into UserInterest objects
+    const userInterests: Record<string, UserInterest> = {};
+
+    // Process outgoing ratings (user's interest in others)
+    outgoingRatings?.forEach((rating: UserRating) => {
+      const friendId = rating.rated_user_id;
+      if (!userInterests[friendId]) {
+        userInterests[friendId] = { id: friendId };
+      }
+      userInterests[friendId].interestLevel = rating.interest_level;
+    });
+
+    // Process incoming ratings (others' interest in the user)
+    incomingRatings?.forEach((rating: UserRating) => {
+      const friendId = rating.user_id;
+      if (!userInterests[friendId]) {
+        userInterests[friendId] = { id: friendId };
+      }
+      userInterests[friendId].theirInterestLevel = rating.interest_level;
+    });
+
+    return Object.values(userInterests);
+  } catch (e) {
+    console.error("Error loading ratings from Supabase:", e);
     return [];
   }
 };

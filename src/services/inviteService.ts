@@ -1,4 +1,5 @@
 import { Contact } from "../types/user";
+import { supabase } from "../lib/supabase";
 
 // Service functions for handling invites
 export const inviteService = {
@@ -46,5 +47,84 @@ export const inviteService = {
         resolve(Math.random() > 0.7);
       }, 500);
     });
+  },
+
+  /**
+   * Generate a unique invite link for the current user
+   */
+  generateInviteLink: async (): Promise<string> => {
+    // Get current user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      throw new Error("User must be logged in to generate an invite link");
+    }
+
+    // Generate a unique code
+    const uniqueCode = Math.random().toString(36).substring(2, 10);
+
+    // Store the invite link in the database
+    const { error } = await supabase.from("invite_links").insert([
+      {
+        code: uniqueCode,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+
+    if (error) {
+      console.error("Error creating invite link:", error);
+      throw new Error("Failed to generate invite link");
+    }
+
+    // Return the full invite URL
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/create-account?invite=${uniqueCode}`;
+  },
+
+  /**
+   * Process an invite link and connect users
+   */
+  processInviteLink: async (
+    inviteCode: string,
+    newUserId: string,
+  ): Promise<boolean> => {
+    try {
+      // Find the invite link in the database
+      const { data: inviteData, error: inviteError } = await supabase
+        .from("invite_links")
+        .select("user_id")
+        .eq("code", inviteCode)
+        .single();
+
+      if (inviteError || !inviteData) {
+        console.error("Error finding invite link:", inviteError);
+        return false;
+      }
+
+      // Create a connection between the users
+      const { error: connectionError } = await supabase
+        .from("connections")
+        .insert([
+          {
+            user_id: inviteData.user_id,
+            connected_user_id: newUserId,
+            status: "connected",
+            created_at: new Date().toISOString(),
+          },
+        ]);
+
+      if (connectionError) {
+        console.error("Error creating connection:", connectionError);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error processing invite link:", error);
+      return false;
+    }
   },
 };
