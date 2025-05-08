@@ -128,7 +128,7 @@ export const loadUserRatingsFromSupabase = async (
   try {
     // Get ratings made by the current user
     const { data: outgoingRatings, error: outgoingError } = await supabase
-      .from("user_ratings")
+      .from<UserRating>("user_ratings")
       .select("*")
       .eq("user_id", userId);
 
@@ -139,7 +139,7 @@ export const loadUserRatingsFromSupabase = async (
 
     // Get ratings made about the current user
     const { data: incomingRatings, error: incomingError } = await supabase
-      .from("user_ratings")
+      .from<UserRating>("user_ratings")
       .select("*")
       .eq("rated_user_id", userId);
 
@@ -152,7 +152,7 @@ export const loadUserRatingsFromSupabase = async (
     const userInterests: Record<string, UserInterest> = {};
 
     // Process outgoing ratings (user's interest in others)
-    outgoingRatings?.forEach((rating: UserRating) => {
+    outgoingRatings?.forEach((rating) => {
       const friendId = rating.rated_user_id;
       if (!userInterests[friendId]) {
         userInterests[friendId] = { id: friendId };
@@ -161,7 +161,7 @@ export const loadUserRatingsFromSupabase = async (
     });
 
     // Process incoming ratings (others' interest in the user)
-    incomingRatings?.forEach((rating: UserRating) => {
+    incomingRatings?.forEach((rating) => {
       const friendId = rating.user_id;
       if (!userInterests[friendId]) {
         userInterests[friendId] = { id: friendId };
