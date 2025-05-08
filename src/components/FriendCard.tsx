@@ -68,7 +68,7 @@ const FriendCard: React.FC<FriendCardProps> = ({
       // Check if a rating already exists
       const { data: existingRating, error: fetchError } = await supabase
         .from("user_ratings")
-        .select("*")
+        .select()
         .eq("user_id", userId)
         .eq("rated_user_id", friend.id)
         .single();
@@ -79,6 +79,9 @@ const FriendCard: React.FC<FriendCardProps> = ({
         return;
       }
 
+      // Type assertion to ensure TypeScript knows the structure
+      const typedExistingRating = existingRating as UserRating | null;
+
       if (existingRating) {
         // Update existing rating
         const { error: updateError } = await supabase
@@ -87,7 +90,7 @@ const FriendCard: React.FC<FriendCardProps> = ({
             interest_level: level,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", existingRating.id);
+          .eq("id", typedExistingRating?.id);
 
         if (updateError) {
           console.error("Error updating rating:", updateError);

@@ -95,7 +95,7 @@ export const inviteService = {
       // Find the invite link in the database
       const { data: inviteData, error: inviteError } = await supabase
         .from("invite_links")
-        .select("user_id")
+        .select()
         .eq("code", inviteCode)
         .single();
 
@@ -104,11 +104,14 @@ export const inviteService = {
         return false;
       }
 
+      // Type assertion to ensure TypeScript knows the structure
+      const typedInviteData = inviteData as InviteLink;
+
       // Create a connection between the users
       const { error: connectionError } = await supabase
         .from("connections")
         .insert({
-          user_id: inviteData.user_id,
+          user_id: typedInviteData.user_id,
           friend_id: newUserId,
           status: "connected",
           created_at: new Date().toISOString(),
