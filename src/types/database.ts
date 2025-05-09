@@ -15,13 +15,15 @@ export interface InviteLink {
   user_id: string;
   created_at: string;
   used: boolean;
+  used_at?: string;
+  used_by_user_id?: string;
 }
 
 export interface Connection {
   id: string;
   user_id: string;
   friend_id: string;
-  status: string;
+  status: "pending" | "connected" | "declined" | "blocked";
   created_at: string;
   updated_at?: string;
 }

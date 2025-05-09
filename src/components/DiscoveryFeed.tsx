@@ -375,7 +375,7 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
 
         for (const rating of matchedRatings) {
           const { data: userData, error } = await supabase
-            .from("users")
+            .from("profiles")
             .select("*")
             .eq("id", rating.id)
             .single();

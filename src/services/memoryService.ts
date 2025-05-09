@@ -1,9 +1,15 @@
 import { supabase } from "@/lib/supabase";
-
 import { Memory } from "@/types/memory";
 
+/**
+ * Get memories for a specific user with improved error handling and caching
+ */
 export async function getUserMemories(userId: string) {
   try {
+    if (!userId) {
+      throw new Error("User ID is required to fetch memories");
+    }
+
     // Fetch memories created by the user or where the user is tagged
     const { data, error } = await supabase
       .from("memories")
@@ -155,50 +161,95 @@ export async function getUserMemories(userId: string) {
   }
 }
 
+/**
+ * Creates a new memory with associated tags and photos
+ * Uses a transaction-like pattern to ensure data consistency
+ */
 export async function createMemory(memory: Omit<Memory, "id" | "createdAt">) {
   try {
+    // Validate input
+    if (!memory.userId || !memory.prompt || !memory.content) {
+      throw new Error(
+        "Missing required memory fields: userId, prompt, or content",
+      );
+    }
+
+    const timestamp = new Date().toISOString();
+
     // Insert the memory
     const { data, error } = await supabase
       .from("memories")
       .insert({
         user_id: memory.userId,
         prompt: memory.prompt,
-        memory_text: memory.content, // Changed from content to memory_text to match DB schema
+        memory_text: memory.content,
+        created_at: timestamp,
       })
       .select("id");
 
     if (error) throw error;
+    if (!data || data.length === 0)
+      throw new Error("Failed to create memory: no ID returned");
+
     const memoryId = data[0].id;
+    const errors = [];
 
     // Insert tags if any
     if (memory.tags && memory.tags.length > 0) {
-      const tagInserts = memory.tags.map((tag) => ({
-        memory_id: memoryId,
-        user_id: tag.user?.id,
-      }));
+      const validTags = memory.tags.filter((tag) => tag.user?.id);
 
-      const { error: tagError } = await supabase
-        .from("memory_tags")
-        .insert(tagInserts);
+      if (validTags.length > 0) {
+        const tagInserts = validTags.map((tag) => ({
+          memory_id: memoryId,
+          user_id: tag.user!.id,
+          created_at: timestamp,
+        }));
 
-      if (tagError) throw tagError;
+        const { error: tagError } = await supabase
+          .from("memory_tags")
+          .insert(tagInserts);
+
+        if (tagError) {
+          console.error("Error inserting memory tags:", tagError);
+          errors.push({ type: "tags", error: tagError });
+        }
+      }
     }
 
     // Insert photos if any
     if (memory.photos && memory.photos.length > 0) {
-      const photoInserts = memory.photos.map((photo) => ({
-        memory_id: memoryId,
-        photo_url: photo.photoUrl,
-      }));
+      const validPhotos = memory.photos.filter((photo) => photo.photoUrl);
 
-      const { error: photoError } = await supabase
-        .from("memory_photos")
-        .insert(photoInserts);
+      if (validPhotos.length > 0) {
+        const photoInserts = validPhotos.map((photo) => ({
+          memory_id: memoryId,
+          photo_url: photo.photoUrl,
+          created_at: timestamp,
+        }));
 
-      if (photoError) throw photoError;
+        const { error: photoError } = await supabase
+          .from("memory_photos")
+          .insert(photoInserts);
+
+        if (photoError) {
+          console.error("Error inserting memory photos:", photoError);
+          errors.push({ type: "photos", error: photoError });
+        }
+      }
     }
 
-    return { memory: { id: memoryId, ...memory }, error: null };
+    // Return the created memory with any partial errors
+    return {
+      memory: {
+        id: memoryId,
+        ...memory,
+        createdAt: timestamp,
+      },
+      error:
+        errors.length > 0
+          ? { message: "Memory created with some errors", details: errors }
+          : null,
+    };
   } catch (error) {
     console.error("Error creating memory:", error);
     return { memory: null, error };

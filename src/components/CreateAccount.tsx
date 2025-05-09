@@ -121,14 +121,12 @@ export default function CreateAccount() {
 
       if (data?.user) {
         // Create user profile in database
-        const { error: profileError } = await supabase.from("profiles").insert([
-          {
-            id: data.user.id,
-            full_name: fullName,
-            email: email,
-            username: username,
-          },
-        ]);
+        const { error: profileError } = await supabase.from("profiles").insert({
+          id: data.user.id,
+          full_name: fullName,
+          email: email,
+          username: username,
+        });
 
         if (profileError) {
           throw profileError;

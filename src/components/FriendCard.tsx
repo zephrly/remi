@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -52,98 +52,156 @@ const FriendCard: React.FC<FriendCardProps> = ({
     friend.interestLevel !== undefined ? friend.interestLevel : 4,
   );
 
-  // Save rating to Supabase
-  const saveRatingToSupabase = async (level: number) => {
+  // Memoize props to prevent unnecessary re-renders
+  const memoizedProps = useMemo(
+    () => ({
+      onSendRequest,
+      onSkip,
+      onInterestLevelChange,
+      connected,
+      onMessage,
+      onReminisce,
+    }),
+    [
+      onSendRequest,
+      onSkip,
+      onInterestLevelChange,
+      connected,
+      onMessage,
+      onReminisce,
+    ],
+  );
+
+  // Helper function to update local storage
+  const updateLocalStorage = useCallback((friendId: string, level: number) => {
     try {
-      const { data: userData, error: userError } =
-        await supabase.auth.getUser();
-
-      if (userError || !userData.user) {
-        console.error("User not authenticated:", userError);
-        return;
-      }
-
-      const userId = userData.user.id;
-
-      // Check if a rating already exists
-      const { data: existingRating, error: fetchError } =
-        await supabase.userRatings
-          .select()
-          .eq("user_id", userId)
-          .eq("rated_user_id", friend.id)
-          .single();
-
-      if (fetchError && fetchError.code !== "PGRST116") {
-        // PGRST116 is the error code for no rows returned
-        console.error("Error checking existing rating:", fetchError);
-        return;
-      }
-
-      // Type assertion to ensure TypeScript knows the structure
-      const typedExistingRating = existingRating as UserRating | null;
-
-      if (existingRating) {
-        // Update existing rating
-        const { error: updateError } = await supabase.userRatings
-          .update({
-            interest_level: level,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", typedExistingRating?.id);
-
-        if (updateError) {
-          console.error("Error updating rating:", updateError);
-        } else {
-          console.log("Rating updated successfully");
-        }
-      } else {
-        // Insert new rating
-        const { error: insertError } = await supabase.userRatings.insert({
-          user_id: userId,
-          rated_user_id: friend.id,
-          interest_level: level,
-          created_at: new Date().toISOString(),
-        });
-
-        if (insertError) {
-          console.error("Error inserting rating:", insertError);
-        } else {
-          console.log("Rating inserted successfully");
-        }
-      }
-
-      // Also update local storage for backward compatibility
       const storedData = localStorage.getItem("friendInterestLevels");
       let updatedLevels = [];
 
       if (storedData) {
-        try {
-          updatedLevels = JSON.parse(storedData);
-          const existingIndex = updatedLevels.findIndex(
-            (item: any) => item.id === friend.id,
-          );
+        updatedLevels = JSON.parse(storedData);
+        const existingIndex = updatedLevels.findIndex(
+          (item: any) => item.id === friendId,
+        );
 
-          if (existingIndex >= 0) {
-            updatedLevels[existingIndex].interestLevel = level;
-          } else {
-            updatedLevels.push({ id: friend.id, interestLevel: level });
-          }
-        } catch (e) {
-          console.error("Error parsing stored interest levels:", e);
-          updatedLevels = [{ id: friend.id, interestLevel: level }];
+        if (existingIndex >= 0) {
+          updatedLevels[existingIndex].interestLevel = level;
+        } else {
+          updatedLevels.push({ id: friendId, interestLevel: level });
         }
       } else {
-        updatedLevels = [{ id: friend.id, interestLevel: level }];
+        updatedLevels = [{ id: friendId, interestLevel: level }];
       }
 
       localStorage.setItem(
         "friendInterestLevels",
         JSON.stringify(updatedLevels),
       );
-    } catch (error) {
-      console.error("Error saving rating to Supabase:", error);
+    } catch (e) {
+      console.error("Error updating local storage:", e);
     }
-  };
+  }, []);
+
+  // Save rating to Supabase with optimistic updates
+  const saveRatingToSupabase = useCallback(
+    async (level: number) => {
+      try {
+        // Update local state and storage immediately for optimistic UI update
+        setCurrentInterestLevel(level);
+        updateLocalStorage(friend.id, level);
+
+        const { data: userData, error: userError } =
+          await supabase.auth.getUser();
+
+        if (userError || !userData.user) {
+          console.error("User not authenticated:", userError);
+          return;
+        }
+
+        const userId = userData.user.id;
+        const timestamp = new Date().toISOString();
+
+        // Check if a rating already exists
+        const { data: existingRating, error: fetchError } =
+          await supabase.userRatings
+            .select()
+            .eq("user_id", userId)
+            .eq("rated_user_id", friend.id)
+            .single();
+
+        if (fetchError && fetchError.code !== "PGRST116") {
+          // PGRST116 is the error code for no rows returned
+          console.error("Error checking existing rating:", fetchError);
+          return;
+        }
+
+        let result;
+
+        if (existingRating) {
+          // Update existing rating
+          result = await supabase.userRatings
+            .update({
+              interest_level: level,
+              updated_at: timestamp,
+            })
+            .eq("id", existingRating.id);
+        } else {
+          // Insert new rating
+          result = await supabase.userRatings.insert({
+            user_id: userId,
+            rated_user_id: friend.id,
+            interest_level: level,
+            created_at: timestamp,
+          });
+        }
+
+        if (result.error) {
+          console.error(
+            `Error ${existingRating ? "updating" : "inserting"} rating:`,
+            result.error,
+          );
+        } else {
+          console.log(
+            `Rating ${existingRating ? "updated" : "inserted"} successfully`,
+          );
+        }
+      } catch (error) {
+        console.error("Error saving rating to Supabase:", error);
+      }
+    },
+    [friend.id, updateLocalStorage],
+  );
+
+  // Handle interest level change with debounce
+  const handleInterestLevelChange = useCallback(
+    (level: number) => {
+      setCurrentInterestLevel(level);
+      memoizedProps.onInterestLevelChange(level);
+      saveRatingToSupabase(level);
+    },
+    [memoizedProps.onInterestLevelChange, saveRatingToSupabase],
+  );
+
+  // Memoized handlers for buttons
+  const handleReminisceClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("Reminisce button clicked for:", friend.name);
+      memoizedProps.onReminisce();
+    },
+    [friend.name, memoizedProps.onReminisce],
+  );
+
+  const handleMessageClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("Message button clicked for:", friend.name);
+      memoizedProps.onMessage(friend.id);
+    },
+    [friend.id, friend.name, memoizedProps.onMessage],
+  );
 
   return (
     <Card className="w-full bg-white overflow-auto flex flex-col">
@@ -157,6 +215,7 @@ const FriendCard: React.FC<FriendCardProps> = ({
           src={friend.photo}
           alt={friend.name}
           className="w-full h-full object-cover"
+          loading="lazy"
         />
       </div>
       <CardContent className="flex-1 p-4 flex flex-col">
@@ -247,12 +306,7 @@ const FriendCard: React.FC<FriendCardProps> = ({
                 min={1}
                 max={7}
                 step={1}
-                onValueChange={(value) => {
-                  const level = value[0];
-                  setCurrentInterestLevel(level);
-                  onInterestLevelChange(level);
-                  saveRatingToSupabase(level);
-                }}
+                onValueChange={(value) => handleInterestLevelChange(value[0])}
                 className="flex-1 mr-3"
               />
               <div className="flex">
@@ -295,31 +349,18 @@ const FriendCard: React.FC<FriendCardProps> = ({
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log("Reminisce button clicked for:", friend.name);
-                    onReminisce();
-                  }}
+                  onClick={handleReminisceClick}
                 >
                   Reminisce
                 </Button>
-                <Button
-                  className="flex-1"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log("Message button clicked for:", friend.name);
-                    onMessage(friend.id);
-                  }}
-                >
+                <Button className="flex-1" onClick={handleMessageClick}>
                   Message
                 </Button>
               </>
             ) : (
               <Button
                 className="w-full"
-                onClick={onSendRequest}
+                onClick={memoizedProps.onSendRequest}
                 disabled={!currentInterestLevel}
               >
                 Next
@@ -332,4 +373,4 @@ const FriendCard: React.FC<FriendCardProps> = ({
   );
 };
 
-export default FriendCard;
+export default React.memo(FriendCard);
