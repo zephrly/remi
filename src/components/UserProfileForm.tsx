@@ -452,7 +452,7 @@ const FormWrapper = (props: UserProfileFormProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form id="profile-form" onSubmit={handleSubmit}>
       <UserProfileForm {...props} />
     </form>
   );

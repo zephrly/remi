@@ -357,7 +357,25 @@ const UserProfile = ({
           </div>
           <Button
             variant={isEditing ? "default" : "outline"}
-            onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
+            onClick={() => {
+              if (isEditing) {
+                // When in edit mode, this button acts as a submit button for the form
+                const form = document.getElementById(
+                  "profile-form",
+                ) as HTMLFormElement;
+                if (form) {
+                  form.dispatchEvent(
+                    new Event("submit", { cancelable: true, bubbles: true }),
+                  );
+                } else {
+                  // Fallback if form element not found
+                  handleSave();
+                }
+              } else {
+                // When not in edit mode, switch to edit mode
+                setIsEditing(true);
+              }
+            }}
             className="flex items-center gap-1"
             disabled={loading || uploadingAvatar}
             type="button"
