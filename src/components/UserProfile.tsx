@@ -143,6 +143,12 @@ const UserProfile = ({
   };
 
   const handleSave = async () => {
+    // Only proceed if we're in editing mode
+    if (!isEditing) {
+      setIsEditing(true);
+      return;
+    }
+
     setLoading(true);
     try {
       console.log("Starting profile save...");
