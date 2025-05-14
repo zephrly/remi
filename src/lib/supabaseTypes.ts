@@ -53,18 +53,18 @@ export function enhanceSupabaseClient(
 
   // Add inviteLinks methods
   enhanced.inviteLinks = {
-    select: () => client.from("invite_links"),
-    insert: (data) => client.from("invite_links").insert(data),
-    update: (data) => client.from("invite_links").update(data),
-    delete: () => client.from("invite_links").delete(),
+    select: () => client.from("invite_links" as any),
+    insert: (data) => client.from("invite_links" as any).insert(data as any),
+    update: (data) => client.from("invite_links" as any).update(data as any),
+    delete: () => client.from("invite_links" as any).delete(),
   };
 
   // Add connections methods
   enhanced.connections = {
-    select: () => client.from("connections"),
-    insert: (data) => client.from("connections").insert(data),
-    update: (data) => client.from("connections").update(data),
-    delete: () => client.from("connections").delete(),
+    select: () => client.from("connections" as any),
+    insert: (data) => client.from("connections" as any).insert(data as any),
+    update: (data) => client.from("connections" as any).update(data as any),
+    delete: () => client.from("connections" as any).delete(),
   };
 
   return enhanced;
