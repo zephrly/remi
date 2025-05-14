@@ -184,11 +184,39 @@ const UserProfile = ({
 
       console.log("Saving profile data:", updateData);
 
-      const { data, error } = await supabase
+      // First check if profile exists
+      const { data: existingProfile, error: checkError } = await supabase
         .from("profiles")
-        .update(updateData)
+        .select("id")
         .eq("id", session.user.id)
-        .select();
+        .single();
+
+      console.log("Profile check result:", existingProfile, checkError);
+
+      let data, error;
+
+      if (checkError && checkError.code === "PGRST116") {
+        // Profile doesn't exist, insert it
+        console.log("Profile doesn't exist, creating new profile");
+        const result = await supabase
+          .from("profiles")
+          .insert({ ...updateData, id: session.user.id })
+          .select();
+
+        data = result.data;
+        error = result.error;
+      } else {
+        // Profile exists, update it
+        console.log("Profile exists, updating");
+        const result = await supabase
+          .from("profiles")
+          .update(updateData)
+          .eq("id", session.user.id)
+          .select();
+
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) {
         console.error("Error updating profile:", error);
@@ -365,23 +393,8 @@ const UserProfile = ({
           <Button
             variant={isEditing ? "default" : "outline"}
             onClick={() => {
-              if (isEditing) {
-                // When in edit mode, this button acts as a submit button for the form
-                const form = document.getElementById(
-                  "profile-form",
-                ) as HTMLFormElement;
-                if (form) {
-                  form.dispatchEvent(
-                    new Event("submit", { cancelable: true, bubbles: true }),
-                  );
-                } else {
-                  // Fallback if form element not found
-                  handleSave();
-                }
-              } else {
-                // When not in edit mode, switch to edit mode
-                setIsEditing(true);
-              }
+              console.log("Save button clicked");
+              handleSave();
             }}
             className="flex items-center gap-1"
             disabled={loading || uploadingAvatar}

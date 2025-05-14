@@ -448,7 +448,8 @@ const UserProfileForm = ({
 const FormWrapper = (props: UserProfileFormProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted, onSave function exists:", !!props.onSave);
+    console.log("Form submitted, calling onSave directly");
+    // Always call onSave directly
     if (props.onSave) {
       props.onSave();
     }
@@ -460,8 +461,12 @@ const FormWrapper = (props: UserProfileFormProps) => {
       {props.isEditing && (
         <div className="mt-8 flex justify-end">
           <Button
-            type="submit"
-            className="bg-brandAccent hover:bg-opacity-90 text-white py-2 px-4 rounded-md flex items-center gap-2"
+            type="button"
+            onClick={() => {
+              console.log("Bottom save button clicked");
+              if (props.onSave) props.onSave();
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md flex items-center gap-2"
           >
             Save Profile
           </Button>
