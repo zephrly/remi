@@ -444,16 +444,29 @@ const UserProfileForm = ({
   );
 };
 
-// Add a form submit handler to prevent default form submission
+// Add a form submit handler that properly calls the onSave function
 const FormWrapper = (props: UserProfileFormProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Form submission is handled by the parent component
+    console.log("Form submitted, onSave function exists:", !!props.onSave);
+    if (props.onSave) {
+      props.onSave();
+    }
   };
 
   return (
     <form id="profile-form" onSubmit={handleSubmit}>
       <UserProfileForm {...props} />
+      {props.isEditing && (
+        <div className="mt-8 flex justify-end">
+          <Button
+            type="submit"
+            className="bg-brandAccent hover:bg-opacity-90 text-white py-2 px-4 rounded-md flex items-center gap-2"
+          >
+            Save Profile
+          </Button>
+        </div>
+      )}
     </form>
   );
 };

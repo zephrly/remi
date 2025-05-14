@@ -197,6 +197,13 @@ const UserProfile = ({
 
       console.log("Profile updated successfully:", data);
 
+      // Force a UI update to reflect changes
+      setProfile((prev) => ({
+        ...prev,
+        name: updateData.full_name,
+        avatar: updateData.avatar_url,
+      }));
+
       // Also update the users table if it exists
       try {
         const { error: userUpdateError } = await supabase
