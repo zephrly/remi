@@ -145,6 +145,7 @@ const UserProfile = ({
   const handleSave = async () => {
     setLoading(true);
     try {
+      console.log("Starting profile save...");
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -172,23 +173,58 @@ const UserProfile = ({
         address: profile.address,
         connected_accounts: profile.connectedAccounts,
         avatar_url: profile.avatar,
+        updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
+      console.log("Saving profile data:", updateData);
+
+      const { data, error } = await supabase
         .from("profiles")
         .update(updateData)
-        .eq("id", session.user.id);
+        .eq("id", session.user.id)
+        .select();
 
       if (error) {
+        console.error("Error updating profile:", error);
         throw error;
+      }
+
+      console.log("Profile updated successfully:", data);
+
+      // Also update the users table if it exists
+      try {
+        const { error: userUpdateError } = await supabase
+          .from("users")
+          .update({
+            avatar: profile.avatar,
+            name: updateData.full_name,
+            updated_at: updateData.updated_at,
+          })
+          .eq("id", session.user.id);
+
+        if (userUpdateError) {
+          console.warn("Could not update users table:", userUpdateError);
+          // Don't throw here as the profiles table update was successful
+        }
+      } catch (userUpdateError) {
+        console.warn("Error updating users table:", userUpdateError);
+        // Continue as this is a secondary update
       }
 
       toast({
         title: "Success",
         description: "Profile updated successfully.",
+        duration: 3000,
       });
 
       setIsEditing(false);
+
+      // If onBack function exists, call it after a short delay to allow the user to see the success message
+      if (onBack) {
+        setTimeout(() => {
+          onBack();
+        }, 1500);
+      }
     } catch (error: any) {
       console.error("Error saving profile:", error);
       toast({
@@ -206,11 +242,17 @@ const UserProfile = ({
 
     try {
       console.log("Starting avatar upload for file:", file.name);
+      setLoading(true); // Show loading state while uploading
 
       const { publicUrl } = await uploadAvatar(file);
 
       if (!publicUrl) {
         console.error("No public URL returned from upload");
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to get URL for uploaded image.",
+        });
         return;
       }
 
@@ -228,18 +270,49 @@ const UserProfile = ({
 
       if (!session) {
         console.error("No session found when updating profile");
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "You must be logged in to update your profile.",
+        });
         return;
       }
 
+      console.log("Updating profile with new avatar URL:", publicUrl);
       // Save the avatar URL to the user's profile in the database
-      const { error: updateError } = await supabase
+      const { error: updateProfileError } = await supabase
         .from("profiles")
-        .update({ avatar_url: publicUrl })
+        .update({
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", session.user.id);
 
-      if (updateError) {
-        console.error("Error updating profile with new avatar:", updateError);
-        throw updateError;
+      if (updateProfileError) {
+        console.error(
+          "Error updating profile with new avatar:",
+          updateProfileError,
+        );
+        throw updateProfileError;
+      }
+
+      // Also update the users table if it exists
+      try {
+        const { error: updateUserError } = await supabase
+          .from("users")
+          .update({ avatar: publicUrl })
+          .eq("id", session.user.id);
+
+        if (updateUserError) {
+          console.warn(
+            "Could not update avatar in users table:",
+            updateUserError,
+          );
+          // Don't throw here, as the profiles table update was successful
+        }
+      } catch (userUpdateError) {
+        console.warn("Error updating users table:", userUpdateError);
+        // Continue as this is a secondary update
       }
 
       toast({
@@ -253,6 +326,8 @@ const UserProfile = ({
         title: "Error",
         description: error.message || "Failed to upload profile picture.",
       });
+    } finally {
+      setLoading(false); // Hide loading state when done
     }
   };
 
@@ -279,6 +354,7 @@ const UserProfile = ({
             onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
             className="flex items-center gap-1"
             disabled={loading || uploadingAvatar}
+            type="button"
           >
             {isEditing ? (
               <>
@@ -319,6 +395,7 @@ const UserProfile = ({
               handleAddressChange={handleAddressChange}
               handleSocialToggle={handleSocialToggle}
               handleAvatarChange={handleAvatarChange}
+              onSave={isEditing ? handleSave : undefined}
             />
           </>
         )}

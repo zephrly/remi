@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 
 interface UserProfileFormProps {
+  onSave?: () => void;
   profile: {
     id: string;
     name: string;
@@ -92,8 +93,37 @@ const UserProfileForm = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0] && handleAvatarChange) {
-      console.log("File selected:", e.target.files[0].name);
-      handleAvatarChange(e.target.files[0]);
+      const file = e.target.files[0];
+      console.log(
+        "File selected:",
+        file.name,
+        "type:",
+        file.type,
+        "size:",
+        file.size,
+      );
+
+      // Create a preview immediately for better UX
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result && typeof event.target.result === "string") {
+          // Show a temporary preview
+          const previewImg = document.querySelector(
+            ".avatar-preview",
+          ) as HTMLImageElement;
+          if (previewImg) {
+            previewImg.src = event.target.result;
+            previewImg.style.opacity = "0.7"; // Show it's being processed
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+
+      // Process the actual upload
+      handleAvatarChange(file);
+
+      // Reset the input value so the same file can be selected again if needed
+      e.target.value = "";
     }
   };
 
@@ -137,7 +167,11 @@ const UserProfileForm = ({
       <div className="flex flex-col items-center mb-8">
         <div className="relative">
           <Avatar className="h-24 w-24 border-2 border-primary">
-            <AvatarImage src={profile.avatar} alt={profile.name} />
+            <AvatarImage
+              src={profile.avatar}
+              alt={profile.name}
+              className="avatar-preview"
+            />
             <AvatarFallback>{profile.name?.charAt(0) || "U"}</AvatarFallback>
           </Avatar>
           {isEditing && (
@@ -155,6 +189,8 @@ const UserProfileForm = ({
                 size="icon"
                 className="absolute bottom-0 right-0 rounded-full h-8 w-8"
                 onClick={() => fileInputRef.current?.click()}
+                aria-label="Upload profile picture"
+                title="Upload profile picture"
               >
                 <Camera size={16} />
               </Button>
@@ -408,4 +444,18 @@ const UserProfileForm = ({
   );
 };
 
-export default UserProfileForm;
+// Add a form submit handler to prevent default form submission
+const FormWrapper = (props: UserProfileFormProps) => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Form submission is handled by the parent component
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <UserProfileForm {...props} />
+    </form>
+  );
+};
+
+export default FormWrapper;
