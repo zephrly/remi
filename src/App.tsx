@@ -1,3 +1,9 @@
+/**
+ * Purpose: Main application component
+ * Description: Defines the core routes and layout of the application
+ * Dependencies: react, react-router-dom, components
+ * Used by: AppWithRoutes.tsx
+ */
 import { Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import Home from "./components/home";
@@ -18,9 +24,7 @@ function App() {
         <Route path="/onboarding/*" element={<Onboarding />} />
         <Route path="/memories/:memoryId" element={<MemoryDetails />} />
         {/* Add this to prevent 404s when tempo routes are accessed directly */}
-        {import.meta.env.VITE_TEMPO === "true" && (
-          <Route path="/tempobook/*" element={<></>} />
-        )}
+        <Route path="/tempobook/*" element={<></>} />
       </Routes>
     </Suspense>
   );

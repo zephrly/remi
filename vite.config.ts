@@ -1,3 +1,9 @@
+/**
+ * Purpose: Configuration file for Vite, the build tool
+ * Description: Defines project settings, plugins, and server options
+ * Dependencies: vite, @vitejs/plugin-react-swc, tempo-devtools
+ * Used by: Build process
+ */
 import path from "path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
