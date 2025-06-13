@@ -56,60 +56,30 @@ export type Database = {
       }
       connections: {
         Row: {
+          connected_user_id: string
           created_at: string | null
-          first_met_context: string | null
-          friend_id: string
           id: string
-          interest_level: number | null
-          last_contact_period: string | null
-          match_score: number | null
           status: string
-          their_interest_level: number | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          connected_user_id: string
           created_at?: string | null
-          first_met_context?: string | null
-          friend_id: string
           id?: string
-          interest_level?: number | null
-          last_contact_period?: string | null
-          match_score?: number | null
-          status: string
-          their_interest_level?: number | null
+          status?: string
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          connected_user_id?: string
           created_at?: string | null
-          first_met_context?: string | null
-          friend_id?: string
           id?: string
-          interest_level?: number | null
-          last_contact_period?: string | null
-          match_score?: number | null
           status?: string
-          their_interest_level?: number | null
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "connections_friend_id_fkey"
-            columns: ["friend_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "connections_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       contacts: {
         Row: {
@@ -160,6 +130,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      invite_links: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          used: boolean | null
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          used?: boolean | null
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          used?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
       }
       memories: {
         Row: {
@@ -324,22 +318,7 @@ export type Database = {
           last_message_at?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "message_sessions_friend_id_fkey"
-            columns: ["friend_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "message_sessions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       messages: {
         Row: {
@@ -348,6 +327,7 @@ export type Database = {
           read: boolean | null
           recipient_id: string
           sender_id: string
+          session_id: string | null
           text: string
         }
         Insert: {
@@ -356,6 +336,7 @@ export type Database = {
           read?: boolean | null
           recipient_id: string
           sender_id: string
+          session_id?: string | null
           text: string
         }
         Update: {
@@ -364,21 +345,15 @@ export type Database = {
           read?: boolean | null
           recipient_id?: string
           sender_id?: string
+          session_id?: string | null
           text?: string
         }
         Relationships: [
           {
-            foreignKeyName: "messages_recipient_id_fkey"
-            columns: ["recipient_id"]
+            foreignKeyName: "messages_session_id_fkey"
+            columns: ["session_id"]
             isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "messages_sender_id_fkey"
-            columns: ["sender_id"]
-            isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "message_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -417,32 +392,47 @@ export type Database = {
         Row: {
           avatar_url: string | null
           bio: string | null
+          city: string | null
+          country: string | null
           created_at: string | null
+          date_of_birth: string | null
           email: string | null
           full_name: string | null
           id: string
+          state: string | null
           updated_at: string | null
           username: string | null
+          zip_code: string | null
         }
         Insert: {
           avatar_url?: string | null
           bio?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string | null
+          date_of_birth?: string | null
           email?: string | null
           full_name?: string | null
           id: string
+          state?: string | null
           updated_at?: string | null
           username?: string | null
+          zip_code?: string | null
         }
         Update: {
           avatar_url?: string | null
           bio?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string | null
+          date_of_birth?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
+          state?: string | null
           updated_at?: string | null
           username?: string | null
+          zip_code?: string | null
         }
         Relationships: []
       }
@@ -495,6 +485,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_ratings: {
+        Row: {
+          created_at: string | null
+          id: string
+          interest_level: number
+          rated_user_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          interest_level: number
+          rated_user_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          interest_level?: number
+          rated_user_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       users: {
         Row: {

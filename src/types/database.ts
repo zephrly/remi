@@ -28,6 +28,24 @@ export interface Connection {
   updated_at?: string;
 }
 
+export interface MessageSession {
+  id: string;
+  user_id: string;
+  friend_id: string;
+  created_at: string;
+  last_message_at: string;
+}
+
+export interface Message {
+  id: string;
+  session_id: string | null;
+  sender_id: string;
+  recipient_id: string;
+  text: string;
+  read?: boolean | null;
+  created_at: string;
+}
+
 // Define all table names for type safety
 export type TableName =
   | "users"
@@ -51,4 +69,6 @@ export type Tables = {
   user_ratings: UserRating;
   invite_links: InviteLink;
   connections: Connection;
+  message_sessions: MessageSession;
+  messages: Message;
 };

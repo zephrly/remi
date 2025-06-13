@@ -66,13 +66,14 @@ const UserProfile = ({
           return;
         }
 
+        console.log("Fetching profile for user:", session.user.id);
         const { data, error } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", session.user.id)
           .single();
 
-        if (error) {
+        if (error && error.code !== "PGRST116") {
           console.error("Error fetching profile:", error);
           toast({
             variant: "destructive",
@@ -80,26 +81,82 @@ const UserProfile = ({
             description: "Failed to load profile data.",
           });
         } else if (data) {
+          console.log("Profile data loaded:", data);
+          // Parse the full name to extract first, middle, last names
+          const nameParts = (data.full_name || "").split(" ");
+          const firstName = nameParts[0] || "";
+          const lastName =
+            nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+          const middleName =
+            nameParts.length > 2 ? nameParts.slice(1, -1).join(" ") : "";
+
           // Transform the data to match our component's expected format
           setProfile({
             id: data.id,
-            name: data.full_name || data.name || "",
-            firstName: data.first_name || "",
-            middleName: data.middle_name || "",
-            lastName: data.last_name || "",
+            name: data.full_name || "",
+            firstName: firstName,
+            middleName: middleName,
+            lastName: lastName,
             username: data.username || "",
             email: data.email || session.user.email || "",
             avatar:
               data.avatar_url ||
               "https://api.dicebear.com/7.x/avataaars/svg?seed=" + data.id,
             bio: data.bio || "",
-            location: data.location || "",
+            location: "", // Not stored in profiles table
             dateOfBirth: data.date_of_birth || "",
-            address: data.address || {},
-            connectedAccounts:
-              typeof data.connected_accounts === "object"
-                ? (data.connected_accounts as any)
-                : {},
+            address: {
+              city: data.city || "",
+              state: data.state || "",
+              zipCode: data.zip_code || "",
+              country: data.country || "",
+            },
+            connectedAccounts: {}, // Not stored in profiles table
+          });
+
+          // Try to get additional data from users table
+          try {
+            const { data: userData } = await supabase
+              .from("users")
+              .select("location, connected_accounts")
+              .eq("id", session.user.id)
+              .single();
+
+            if (userData) {
+              setProfile((prev) => ({
+                ...prev,
+                location: userData.location || "",
+                connectedAccounts:
+                  typeof userData.connected_accounts === "object"
+                    ? (userData.connected_accounts as any)
+                    : {},
+              }));
+            }
+          } catch (userError) {
+            console.warn("Could not fetch additional user data:", userError);
+          }
+        } else {
+          // No profile exists yet, create default profile with user data
+          console.log("No profile found, creating default profile");
+          setProfile({
+            id: session.user.id,
+            name:
+              session.user.user_metadata?.full_name ||
+              session.user.email?.split("@")[0] ||
+              "",
+            firstName: "",
+            middleName: "",
+            lastName: "",
+            username: "",
+            email: session.user.email || "",
+            avatar:
+              "https://api.dicebear.com/7.x/avataaars/svg?seed=" +
+              session.user.id,
+            bio: "",
+            location: "",
+            dateOfBirth: "",
+            address: {},
+            connectedAccounts: {},
           });
         }
       } catch (error) {
@@ -165,20 +222,32 @@ const UserProfile = ({
         return;
       }
 
-      // Prepare the data for update
+      // Prepare the data for update - all fields that exist in the profiles table
+      const fullName =
+        `${profile.firstName || ""} ${profile.middleName ? profile.middleName + " " : ""}${profile.lastName || ""}`.trim() ||
+        profile.name;
+
       const updateData = {
-        first_name: profile.firstName,
-        middle_name: profile.middleName,
-        last_name: profile.lastName,
-        username: profile.username,
-        full_name:
-          `${profile.firstName || ""} ${profile.middleName ? profile.middleName + " " : ""}${profile.lastName || ""}`.trim(),
-        bio: profile.bio,
-        location: profile.location,
-        date_of_birth: profile.dateOfBirth,
-        address: profile.address,
-        connected_accounts: profile.connectedAccounts,
+        username: profile.username || null,
+        full_name: fullName,
+        bio: profile.bio || null,
+        email: profile.email || session.user.email,
         avatar_url: profile.avatar,
+        date_of_birth: profile.dateOfBirth || null,
+        city: profile.address?.city || null,
+        state: profile.address?.state || null,
+        zip_code: profile.address?.zipCode || null,
+        country: profile.address?.country || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Prepare additional data for users table (if it exists)
+      const userUpdateData = {
+        name: fullName,
+        bio: profile.bio || null,
+        avatar: profile.avatar,
+        location: profile.location || null,
+        connected_accounts: profile.connectedAccounts || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -225,22 +294,41 @@ const UserProfile = ({
 
       console.log("Profile updated successfully:", data);
 
-      // Force a UI update to reflect changes
-      setProfile((prev) => ({
-        ...prev,
-        name: updateData.full_name,
-        avatar: updateData.avatar_url,
-      }));
+      // Update the local profile state with the saved data to ensure UI reflects the changes
+      if (data && data[0]) {
+        const savedProfile = data[0];
+        const nameParts = (savedProfile.full_name || "").split(" ");
+        const firstName = nameParts[0] || "";
+        const lastName =
+          nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+        const middleName =
+          nameParts.length > 2 ? nameParts.slice(1, -1).join(" ") : "";
+
+        setProfile((prev) => ({
+          ...prev,
+          name: savedProfile.full_name || "",
+          firstName: firstName,
+          middleName: middleName,
+          lastName: lastName,
+          username: savedProfile.username || "",
+          email: savedProfile.email || "",
+          avatar: savedProfile.avatar_url || prev.avatar,
+          bio: savedProfile.bio || "",
+          dateOfBirth: savedProfile.date_of_birth || "",
+          address: {
+            city: savedProfile.city || "",
+            state: savedProfile.state || "",
+            zipCode: savedProfile.zip_code || "",
+            country: savedProfile.country || "",
+          },
+        }));
+      }
 
       // Also update the users table if it exists
       try {
         const { error: userUpdateError } = await supabase
           .from("users")
-          .update({
-            avatar: profile.avatar,
-            name: updateData.full_name,
-            updated_at: updateData.updated_at,
-          })
+          .update(userUpdateData)
           .eq("id", session.user.id);
 
         if (userUpdateError) {
@@ -321,13 +409,14 @@ const UserProfile = ({
 
       console.log("Updating profile with new avatar URL:", publicUrl);
       // Save the avatar URL to the user's profile in the database
-      const { error: updateProfileError } = await supabase
+      const { data: updatedProfile, error: updateProfileError } = await supabase
         .from("profiles")
         .update({
           avatar_url: publicUrl,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", session.user.id);
+        .eq("id", session.user.id)
+        .select();
 
       if (updateProfileError) {
         console.error(
@@ -336,6 +425,8 @@ const UserProfile = ({
         );
         throw updateProfileError;
       }
+
+      console.log("Avatar updated in database:", updatedProfile);
 
       // Also update the users table if it exists
       try {

@@ -2,7 +2,10 @@ import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getMessagingSessions } from "@/utils/matchingService";
+import {
+  getMessagingSessions,
+  getSessionMessages,
+} from "@/utils/matchingService";
 
 interface ConversationsListProps {
   currentUserId: string;
@@ -35,79 +38,106 @@ const ConversationsList: React.FC<ConversationsListProps> = ({
   );
 
   React.useEffect(() => {
-    // Get sessions from local storage
-    const sessions = getMessagingSessions();
+    const loadConversations = async () => {
+      // Get sessions from Supabase
+      const sessions = await getMessagingSessions(currentUserId);
 
-    // Transform sessions into conversation items with mock data where needed
-    const mockConversations: ConversationItem[] = sessions.map((session) => {
-      const isCurrentUserSender = session.userId === currentUserId;
-      const matchId = isCurrentUserSender ? session.matchId : session.userId;
+      // Transform sessions into conversation items with mock data where needed
+      const mockConversations: ConversationItem[] = await Promise.all(
+        sessions.map(async (session) => {
+          const isCurrentUserSender = session.user_id === currentUserId;
+          const matchId = isCurrentUserSender
+            ? session.friend_id
+            : session.user_id;
 
-      // Get the last message if any
-      const lastMessage =
-        session.messages.length > 0
-          ? session.messages[session.messages.length - 1].text
-          : "No messages yet";
+          try {
+            // Get the last message from the session
+            const messages = await getSessionMessages(session.id);
+            const lastMessage =
+              messages.length > 0
+                ? messages[messages.length - 1].text
+                : "No messages yet";
 
-      // Get the last message time
-      const lastMessageTime =
-        session.messages.length > 0
-          ? session.messages[session.messages.length - 1].timestamp
-          : session.createdAt;
+            // Get the last message time
+            const lastMessageTime =
+              messages.length > 0
+                ? new Date(messages[messages.length - 1].created_at)
+                : new Date(
+                    session.created_at || session.last_message_at || Date.now(),
+                  );
 
-      return {
-        sessionId: session.sessionId,
-        matchId,
-        // Mock data for name and avatar
-        matchName: `User ${matchId.substring(0, 5)}`,
-        matchAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${matchId}`,
-        lastMessage,
-        lastMessageTime: new Date(lastMessageTime),
-        unreadCount: Math.floor(Math.random() * 3), // Random unread count for demo
-      };
-    });
-
-    // Add some mock conversations if none exist
-    if (mockConversations.length === 0) {
-      mockConversations.push(
-        {
-          sessionId: "mock-session-1",
-          matchId: "user-1",
-          matchName: "Sarah Johnson",
-          matchAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
-          lastMessage: "Hey! So glad we reconnected!",
-          lastMessageTime: new Date(Date.now() - 3600000),
-          unreadCount: 2,
-        },
-        {
-          sessionId: "mock-session-2",
-          matchId: "user-2",
-          matchName: "Michael Chen",
-          matchAvatar:
-            "https://api.dicebear.com/7.x/avataaars/svg?seed=michael",
-          lastMessage: "Remember that time at the lake?",
-          lastMessageTime: new Date(Date.now() - 86400000),
-          unreadCount: 0,
-        },
-        {
-          sessionId: "mock-session-3",
-          matchId: "user-3",
-          matchName: "Jessica Williams",
-          matchAvatar:
-            "https://api.dicebear.com/7.x/avataaars/svg?seed=jessica",
-          lastMessage: "Let's catch up soon!",
-          lastMessageTime: new Date(Date.now() - 172800000),
-          unreadCount: 0,
-        },
+            return {
+              sessionId: session.id,
+              matchId,
+              // Mock data for name and avatar
+              matchName: `User ${matchId.substring(0, 8)}`,
+              matchAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${matchId}`,
+              lastMessage,
+              lastMessageTime,
+              unreadCount: Math.floor(Math.random() * 3), // Random unread count for demo
+            };
+          } catch (error) {
+            console.error("Error processing session:", session.id, error);
+            return {
+              sessionId: session.id,
+              matchId,
+              matchName: `User ${matchId.substring(0, 8)}`,
+              matchAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${matchId}`,
+              lastMessage: "Error loading messages",
+              lastMessageTime: new Date(
+                session.created_at || session.last_message_at || Date.now(),
+              ),
+              unreadCount: 0,
+            };
+          }
+        }),
       );
-    }
 
-    // Sort by last message time (newest first)
-    mockConversations.sort(
-      (a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime(),
-    );
+      // Add some mock conversations if none exist
+      if (mockConversations.length === 0) {
+        mockConversations.push(
+          {
+            sessionId: "mock-session-1",
+            matchId: "user-1",
+            matchName: "Sarah Johnson",
+            matchAvatar:
+              "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
+            lastMessage: "Hey! So glad we reconnected!",
+            lastMessageTime: new Date(Date.now() - 3600000),
+            unreadCount: 2,
+          },
+          {
+            sessionId: "mock-session-2",
+            matchId: "user-2",
+            matchName: "Michael Chen",
+            matchAvatar:
+              "https://api.dicebear.com/7.x/avataaars/svg?seed=michael",
+            lastMessage: "Remember that time at the lake?",
+            lastMessageTime: new Date(Date.now() - 86400000),
+            unreadCount: 0,
+          },
+          {
+            sessionId: "mock-session-3",
+            matchId: "user-3",
+            matchName: "Jessica Williams",
+            matchAvatar:
+              "https://api.dicebear.com/7.x/avataaars/svg?seed=jessica",
+            lastMessage: "Let's catch up soon!",
+            lastMessageTime: new Date(Date.now() - 172800000),
+            unreadCount: 0,
+          },
+        );
+      }
 
-    setConversations(mockConversations);
+      // Sort by last message time (newest first)
+      mockConversations.sort(
+        (a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime(),
+      );
+
+      setConversations(mockConversations);
+    };
+
+    loadConversations();
   }, [currentUserId]);
 
   // Format the time to display

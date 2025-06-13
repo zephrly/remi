@@ -4,6 +4,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Send, ArrowLeft, Phone, Video, Info } from "lucide-react";
+import {
+  getSessionMessages,
+  addMessageToSession,
+  createMessagingSession,
+  getMessagingSessions,
+} from "@/utils/matchingService";
+import { createClient } from "@supabase/supabase-js";
+
+// Direct Supabase client for debugging
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const directSupabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface Message {
   id: string;
@@ -13,6 +25,7 @@ interface Message {
 }
 
 interface MessagesProps {
+  sessionId?: string;
   matchId?: string;
   matchName?: string;
   matchAvatar?: string;
@@ -25,6 +38,7 @@ interface MessagesProps {
 }
 
 const MessagesPanel: React.FC<MessagesProps> = ({
+  sessionId,
   matchId = "1",
   matchName = "Sarah Johnson",
   matchAvatar = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&q=80",
@@ -32,31 +46,89 @@ const MessagesPanel: React.FC<MessagesProps> = ({
   onBack,
   onVideoCall,
   onVoiceCall,
-  initialMessages = [
-    {
-      id: "1",
-      senderId: "1",
-      text: "Hey! So glad we reconnected!",
-      timestamp: new Date(Date.now() - 3600000),
-    },
-    {
-      id: "2",
-      senderId: "current-user",
-      text: "Me too! It's been way too long.",
-      timestamp: new Date(Date.now() - 3000000),
-    },
-    {
-      id: "3",
-      senderId: "1",
-      text: "What have you been up to since high school?",
-      timestamp: new Date(Date.now() - 2400000),
-    },
-  ],
+  initialMessages = [],
   onSendMessage = () => {},
 }) => {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [newMessage, setNewMessage] = useState("");
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(
+    sessionId || null,
+  );
+  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Load messages when component mounts or sessionId changes
+  useEffect(() => {
+    const loadMessages = async () => {
+      try {
+        console.log(
+          "Loading messages - sessionId:",
+          currentSessionId,
+          "matchId:",
+          matchId,
+          "currentUserId:",
+          currentUserId,
+        );
+
+        if (!currentSessionId) {
+          // Try to find or create session
+          if (matchId && currentUserId) {
+            console.log(
+              "Looking for existing session between:",
+              currentUserId,
+              "and",
+              matchId,
+            );
+
+            // Try to find existing session
+            let sessionToUse = await createMessagingSession(
+              currentUserId,
+              matchId,
+            );
+
+            if (sessionToUse) {
+              console.log("Using session:", sessionToUse.id);
+              setCurrentSessionId(sessionToUse.id);
+
+              // Load messages for this session
+              const sessionMessages = await getSessionMessages(sessionToUse.id);
+              console.log("Loaded messages:", sessionMessages);
+              const formattedMessages = sessionMessages.map((msg) => ({
+                id: msg.id,
+                senderId: msg.sender_id,
+                text: msg.text,
+                timestamp: new Date(msg.created_at),
+              }));
+              setMessages(formattedMessages);
+            } else {
+              console.error("Failed to create or find session");
+              setMessages([]);
+            }
+          }
+        } else {
+          // Load existing messages
+          console.log(
+            "Loading messages for existing session:",
+            currentSessionId,
+          );
+          const sessionMessages = await getSessionMessages(currentSessionId);
+          console.log("Loaded messages:", sessionMessages);
+          const formattedMessages = sessionMessages.map((msg) => ({
+            id: msg.id,
+            senderId: msg.sender_id,
+            text: msg.text,
+            timestamp: new Date(msg.created_at),
+          }));
+          setMessages(formattedMessages);
+        }
+      } catch (error) {
+        console.error("Error loading messages:", error);
+        setMessages([]);
+      }
+    };
+
+    loadMessages();
+  }, [currentSessionId, matchId, currentUserId]);
 
   // Scroll to bottom of messages when messages change
   useEffect(() => {
@@ -67,18 +139,108 @@ const MessagesPanel: React.FC<MessagesProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      const message: Message = {
-        id: Date.now().toString(),
+  const handleSendMessage = async () => {
+    console.log("handleSendMessage called", {
+      newMessage: newMessage.trim(),
+      currentSessionId,
+      loading,
+      currentUserId,
+      matchId,
+    });
+
+    if (!newMessage.trim()) {
+      console.log("No message text, returning");
+      return;
+    }
+
+    if (loading) {
+      console.log("Already loading, returning");
+      return;
+    }
+
+    if (!currentUserId || !matchId) {
+      console.error("Missing required IDs:", { currentUserId, matchId });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Store message text and clear input immediately for better UX
+      const messageText = newMessage.trim();
+      setNewMessage("");
+
+      // Optimistically add the message to the UI
+      const optimisticMessage: Message = {
+        id: `temp-${Date.now()}`,
         senderId: currentUserId,
-        text: newMessage,
+        text: messageText,
         timestamp: new Date(),
       };
 
-      setMessages([...messages, message]);
-      onSendMessage(newMessage);
-      setNewMessage("");
+      setMessages((prev) => [...prev, optimisticMessage]);
+
+      // Ensure we have a session
+      let sessionId = currentSessionId;
+      if (!sessionId) {
+        console.log("No session ID, creating new session");
+        const newSession = await createMessagingSession(currentUserId, matchId);
+        if (newSession) {
+          sessionId = newSession.id;
+          setCurrentSessionId(sessionId);
+          console.log("Created new session:", sessionId);
+        } else {
+          console.error("Failed to create session");
+          // Remove optimistic message and restore input
+          setMessages((prev) =>
+            prev.filter((msg) => msg.id !== optimisticMessage.id),
+          );
+          setNewMessage(messageText);
+          setLoading(false);
+          return;
+        }
+      }
+
+      console.log("Sending message to session:", sessionId);
+      // Save the message to Supabase
+      const savedMessage = await addMessageToSession(
+        sessionId,
+        currentUserId,
+        messageText,
+        matchId,
+      );
+
+      console.log("Message saved:", savedMessage);
+      if (savedMessage) {
+        // Replace the optimistic message with the real one
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === optimisticMessage.id
+              ? {
+                  id: savedMessage.id,
+                  senderId: savedMessage.sender_id,
+                  text: savedMessage.text,
+                  timestamp: new Date(savedMessage.created_at),
+                }
+              : msg,
+          ),
+        );
+        onSendMessage(messageText);
+      } else {
+        console.error("Failed to save message - removing optimistic message");
+        // Remove the optimistic message if save failed
+        setMessages((prev) =>
+          prev.filter((msg) => msg.id !== optimisticMessage.id),
+        );
+        setNewMessage(messageText); // Restore the message text
+      }
+    } catch (error) {
+      console.error("Error in handleSendMessage:", error);
+      // Remove the optimistic message if save failed
+      setMessages((prev) => prev.filter((msg) => msg.id.startsWith("temp-")));
+      setNewMessage(newMessage); // Restore the message text
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -220,7 +382,7 @@ const MessagesPanel: React.FC<MessagesProps> = ({
           <Button
             onClick={handleSendMessage}
             size="icon"
-            disabled={!newMessage.trim()}
+            disabled={!newMessage.trim() || loading}
             className="rounded-full"
           >
             <Send className="h-4 w-4" />

@@ -166,7 +166,7 @@ const UserProfileForm = ({
       {/* Profile Picture */}
       <div className="flex flex-col items-center mb-8">
         <div className="relative">
-          <Avatar className="h-24 w-24 border-2 border-primary">
+          <Avatar className="h-72 w-72 border-2 border-primary">
             <AvatarImage
               src={profile.avatar}
               alt={profile.name}
@@ -455,24 +455,30 @@ const FormWrapper = (props: UserProfileFormProps) => {
     }
   };
 
+  const handleSaveClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("Bottom save button clicked");
+    if (props.onSave) {
+      props.onSave();
+    }
+  };
+
   return (
-    <form id="profile-form" onSubmit={handleSubmit}>
+    <div>
       <UserProfileForm {...props} />
       {props.isEditing && (
         <div className="mt-8 flex justify-end">
           <Button
             type="button"
-            onClick={() => {
-              console.log("Bottom save button clicked");
-              if (props.onSave) props.onSave();
-            }}
+            onClick={handleSaveClick}
             className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md flex items-center gap-2"
           >
             Save Profile
           </Button>
         </div>
       )}
-    </form>
+    </div>
   );
 };
 
