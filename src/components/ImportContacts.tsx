@@ -180,12 +180,22 @@ const ImportContacts: React.FC = () => {
   const generateInviteLink = async () => {
     setLoading((prev) => ({ ...prev, inviteLink: true }));
     try {
+      console.log("Generating invite link...");
       const link = await inviteService.generateInviteLink();
+      console.log("Generated invite link:", link);
       setInviteLink(link);
-      // Don't show dialog, just display the link below the button
-      // setShowInviteLinkDialog(true);
-    } catch (error) {
+      toast({
+        title: "Invite link generated",
+        description: "Your invite link has been created successfully.",
+      });
+    } catch (error: any) {
       console.error("Error generating invite link:", error);
+      toast({
+        title: "Error generating invite link",
+        description:
+          error.message || "Failed to generate invite link. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading((prev) => ({ ...prev, inviteLink: false }));
     }

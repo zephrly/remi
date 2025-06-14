@@ -240,8 +240,80 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
         const userRatings = await loadUserRatingsFromSupabase(currentUserId);
         console.log("Loaded user ratings from Supabase:", userRatings);
 
+        // Get users connected via invite links - simplified query
+        console.log("Fetching connections for user:", currentUserId);
+        const { data: connections, error: connectionsError } = await supabase
+          .from("connections")
+          .select("*")
+          .eq("user_id", currentUserId)
+          .eq("status", "connected");
+
+        if (connectionsError) {
+          console.error("Error fetching connections:", connectionsError);
+        }
+
+        console.log("Raw connections data:", connections);
+
+        const connectedUserIds = new Set();
+        connections?.forEach((conn) => {
+          console.log("Processing connection:", conn);
+          connectedUserIds.add(conn.friend_id);
+          console.log("Added friend_id:", conn.friend_id);
+        });
+
+        console.log("Connected user IDs:", Array.from(connectedUserIds));
+
+        // Get profile data for connected users
+        const connectedFriends = [];
+        for (const userId of connectedUserIds) {
+          console.log("Fetching profile for user:", userId);
+          const { data: userData, error } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", userId)
+            .single();
+
+          if (error) {
+            console.error(
+              "Error fetching profile for user",
+              userId,
+              ":",
+              error,
+            );
+            continue;
+          }
+
+          if (userData) {
+            console.log("Adding connected friend:", userData);
+            connectedFriends.push({
+              id: userData.id,
+              name: userData.full_name || userData.username || "Unknown User",
+              photo:
+                userData.avatar ||
+                `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.id}`,
+              memories: ["Connected via invite link"],
+              mutualConnections: 1,
+              overlapPeriods: ["Recent"],
+              overlapPlaces: ["Remi Platform"],
+              prompts: [
+                {
+                  question: "I remember when...",
+                  answer: "we connected through Remi!",
+                },
+              ],
+              matchScore: 75,
+              isMatch: true,
+            });
+          }
+        }
+
+        console.log("Connected friends to add:", connectedFriends);
+
+        // Combine default friends with connected friends
+        const allFriends = [...friends, ...connectedFriends];
+
         // Update friends with ratings
-        const updatedFriends = friends.map((friend) => {
+        const updatedFriends = allFriends.map((friend) => {
           const ratingData = userRatings.find(
             (rating) => rating.id === friend.id,
           );
@@ -265,30 +337,32 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
           return friend;
         });
 
-        // Update connections with ratings
-        const updatedConnections = connections.map((connection) => {
-          const ratingData = userRatings.find(
-            (rating) => rating.id === connection.id,
-          );
-          if (ratingData) {
-            const matchScore = calculateMatchScore(
-              ratingData.interestLevel,
-              ratingData.theirInterestLevel,
+        // Update connections with ratings (use the connected friends we just created)
+        const updatedConnections = [...connections, ...connectedFriends].map(
+          (connection) => {
+            const ratingData = userRatings.find(
+              (rating) => rating.id === connection.id,
             );
-
-            return {
-              ...connection,
-              interestLevel: ratingData.interestLevel,
-              theirInterestLevel: ratingData.theirInterestLevel,
-              matchScore: matchScore,
-              isMatch: isMatch(
+            if (ratingData) {
+              const matchScore = calculateMatchScore(
                 ratingData.interestLevel,
                 ratingData.theirInterestLevel,
-              ),
-            };
-          }
-          return connection;
-        });
+              );
+
+              return {
+                ...connection,
+                interestLevel: ratingData.interestLevel,
+                theirInterestLevel: ratingData.theirInterestLevel,
+                matchScore: matchScore,
+                isMatch: isMatch(
+                  ratingData.interestLevel,
+                  ratingData.theirInterestLevel,
+                ),
+              };
+            }
+            return connection;
+          },
+        );
 
         setFriendsWithRatings(updatedFriends);
         setConnectionsWithRatings(updatedConnections);
@@ -354,7 +428,7 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
     },
   ]);
 
-  // Load matches when user ID is available
+  // Load matches and connections when user ID is available
   useEffect(() => {
     if (!currentUserId) return;
 
@@ -368,16 +442,49 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
           isMatch(rating.interestLevel, rating.theirInterestLevel),
         );
 
-        if (matchedRatings.length === 0) return;
+        // Also get users connected via invite links - simplified query
+        console.log(
+          "Fetching connections for matches for user:",
+          currentUserId,
+        );
+        const { data: connections, error: connectionsError } = await supabase
+          .from("connections")
+          .select("*")
+          .eq("user_id", currentUserId)
+          .eq("status", "connected");
+
+        console.log("Fetched connections from database:", connections);
+
+        if (connectionsError) {
+          console.error("Error fetching connections:", connectionsError);
+        }
+
+        const connectedUserIds = new Set();
+        connections?.forEach((conn) => {
+          console.log("Processing connection for matches:", conn);
+          connectedUserIds.add(conn.friend_id);
+          console.log("Added friend_id to matches:", conn.friend_id);
+        });
+
+        // Combine matched ratings and connected users
+        const allPotentialMatches = new Set([
+          ...matchedRatings.map((rating) => rating.id),
+          ...Array.from(connectedUserIds),
+        ]);
+
+        if (allPotentialMatches.size === 0) return;
 
         // Get user details for each match
         const matchedUsers = [];
 
-        for (const rating of matchedRatings) {
+        console.log("All potential matches:", Array.from(allPotentialMatches));
+
+        for (const userId of allPotentialMatches) {
+          console.log("Fetching user data for:", userId);
           const { data: userData, error } = await supabase
             .from("profiles")
             .select("*")
-            .eq("id", rating.id)
+            .eq("id", userId)
             .single();
 
           if (error) {
@@ -386,14 +493,18 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
           }
 
           if (userData) {
-            const matchScore = calculateMatchScore(
-              rating.interestLevel,
-              rating.theirInterestLevel,
-            );
+            console.log("Found user data:", userData);
+            const rating = matchedRatings.find((r) => r.id === userId);
+            const matchScore = rating
+              ? calculateMatchScore(
+                  rating.interestLevel,
+                  rating.theirInterestLevel,
+                )
+              : 75; // Default score for invite-based connections
 
             matchedUsers.push({
               id: userData.id,
-              name: userData.name,
+              name: userData.full_name || userData.username || "Unknown User",
               photo:
                 userData.avatar ||
                 `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.id}`,
@@ -402,6 +513,8 @@ const DiscoveryFeed: React.FC<DiscoveryFeedProps> = ({
             });
           }
         }
+
+        console.log("Final matched users:", matchedUsers);
 
         if (matchedUsers.length > 0) {
           setMatches(matchedUsers);

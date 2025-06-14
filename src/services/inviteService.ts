@@ -95,18 +95,32 @@ export const inviteService = {
       let attempts = 0;
       const maxAttempts = 3;
 
-      // Check if code already exists
+      // Check if code already exists using standard supabase client
       while (attempts < maxAttempts) {
-        const { data: existingCode } = await supabase.inviteLinks
-          .select()
+        const { data: existingCode, error: checkError } = await supabase
+          .from("invite_links")
+          .select("code")
           .eq("code", uniqueCode)
           .single();
 
-        if (!existingCode) break; // Code is unique
+        if (checkError && checkError.code === "PGRST116") {
+          // PGRST116 means no rows returned, which means code is unique
+          break;
+        }
 
-        // Code exists, generate a new one
-        uniqueCode = generateUniqueCode();
-        attempts++;
+        if (checkError) {
+          console.error("Error checking code uniqueness:", checkError);
+          // Continue with the code anyway if there's an error checking
+          break;
+        }
+
+        if (existingCode) {
+          // Code exists, generate a new one
+          uniqueCode = generateUniqueCode();
+          attempts++;
+        } else {
+          break; // Code is unique
+        }
       }
 
       if (attempts >= maxAttempts) {
@@ -115,21 +129,25 @@ export const inviteService = {
         );
       }
 
-      // Store the invite link in the database
+      // Store the invite link in the database using standard supabase client
       const timestamp = new Date().toISOString();
-      const { data, error } = await supabase.inviteLinks
+      const { data, error } = await supabase
+        .from("invite_links")
         .insert({
           code: uniqueCode,
           user_id: user.id,
           created_at: timestamp,
           used: false,
         })
-        .select();
+        .select()
+        .single();
 
       if (error) {
         console.error("Error creating invite link:", error);
         throw new Error("Failed to generate invite link: " + error.message);
       }
+
+      console.log("Successfully created invite link:", data);
 
       // Return the full invite URL
       const baseUrl = window.location.origin;
@@ -142,7 +160,7 @@ export const inviteService = {
 
   /**
    * Process an invite link and connect users with improved error handling
-   * and transaction-like behavior
+   * and bidirectional connection creation
    */
   processInviteLink: async (
     inviteCode: string,
@@ -154,9 +172,12 @@ export const inviteService = {
         return false;
       }
 
-      // Find the invite link in the database
-      const { data: inviteData, error: inviteError } =
-        await supabase.inviteLinks.select().eq("code", inviteCode).single();
+      // Find the invite link in the database using standard supabase client
+      const { data: inviteData, error: inviteError } = await supabase
+        .from("invite_links")
+        .select("*")
+        .eq("code", inviteCode)
+        .single();
 
       if (inviteError) {
         console.error("Error finding invite link:", inviteError);
@@ -176,21 +197,58 @@ export const inviteService = {
 
       const timestamp = new Date().toISOString();
 
-      // Create a connection between the users
-      const { error: connectionError } = await supabase.connections.insert({
-        user_id: inviteData.user_id,
-        friend_id: newUserId,
-        status: "connected",
-        created_at: timestamp,
+      console.log("Creating bidirectional connection between:", {
+        inviter: inviteData.user_id,
+        newUser: newUserId,
       });
 
+      // Create bidirectional connections for easier querying
+      const connectionsToCreate = [
+        {
+          user_id: inviteData.user_id,
+          friend_id: newUserId,
+          status: "connected",
+          created_at: timestamp,
+        },
+        {
+          user_id: newUserId,
+          friend_id: inviteData.user_id,
+          status: "connected",
+          created_at: timestamp,
+        },
+      ];
+
+      // Insert both connections
+      const { error: connectionError } = await supabase
+        .from("connections")
+        .insert(connectionsToCreate);
+
       if (connectionError) {
-        console.error("Error creating connection:", connectionError);
+        console.error("Error creating connections:", connectionError);
         return false;
       }
 
-      // Mark the invite as used
-      const { error: updateError } = await supabase.inviteLinks
+      console.log("Successfully created bidirectional connections");
+
+      // Update the new user's profile to track who invited them
+      const { error: profileUpdateError } = await supabase
+        .from("profiles")
+        .update({
+          invited_by_user_id: inviteData.user_id,
+        })
+        .eq("id", newUserId);
+
+      if (profileUpdateError) {
+        console.error(
+          "Error updating profile with inviter info:",
+          profileUpdateError,
+        );
+        // Continue even if this fails - the connection is still created
+      }
+
+      // Mark the invite as used using standard supabase client
+      const { error: updateError } = await supabase
+        .from("invite_links")
         .update({
           used: true,
           used_at: timestamp,
@@ -204,6 +262,7 @@ export const inviteService = {
         // This is not ideal but still a successful connection
       }
 
+      console.log("Successfully processed invite link and created connections");
       return true;
     } catch (error) {
       console.error("Error processing invite link:", error);

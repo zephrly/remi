@@ -104,38 +104,47 @@ export default function CreateAccount() {
     }
 
     try {
-      // Create user in Supabase Auth
+      // Create user in Supabase Auth - the database trigger will automatically create user and profile records
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
+            username: username,
           },
+          emailRedirectTo: undefined, // Disable email confirmation for now
         },
       });
 
       if (signUpError) {
+        console.error("Signup error:", signUpError);
         throw signUpError;
       }
 
       if (data?.user) {
-        // Create user profile in database
-        const { error: profileError } = await supabase.from("profiles").insert({
-          id: data.user.id,
-          full_name: fullName,
-          email: email,
-          username: username,
-        });
+        console.log("User created in auth:", data.user.id);
 
-        if (profileError) {
-          throw profileError;
-        }
+        // The database trigger should have automatically created the user and profile records
+        // Wait a brief moment to ensure the trigger has completed
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
         // If there's an invite code, process it to connect users
         if (inviteCode) {
           try {
-            await inviteService.processInviteLink(inviteCode, data.user.id);
+            const success = await inviteService.processInviteLink(
+              inviteCode,
+              data.user.id,
+            );
+            if (success) {
+              console.log(
+                "Successfully processed invite link and created connection",
+              );
+            } else {
+              console.warn(
+                "Failed to process invite link, but account creation continues",
+              );
+            }
           } catch (connectionError) {
             console.error("Error processing invite link:", connectionError);
             // Continue with account creation even if connection fails

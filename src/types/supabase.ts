@@ -37,43 +37,28 @@ export type Database = {
           status?: string
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "connection_requests_recipient_id_fkey"
-            columns: ["recipient_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "connection_requests_sender_id_fkey"
-            columns: ["sender_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       connections: {
         Row: {
-          connected_user_id: string
           created_at: string | null
+          friend_id: string | null
           id: string
           status: string
           updated_at: string | null
           user_id: string
         }
         Insert: {
-          connected_user_id: string
           created_at?: string | null
+          friend_id?: string | null
           id?: string
           status?: string
           updated_at?: string | null
           user_id: string
         }
         Update: {
-          connected_user_id?: string
           created_at?: string | null
+          friend_id?: string | null
           id?: string
           status?: string
           updated_at?: string | null
@@ -121,15 +106,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "contacts_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       invite_links: {
         Row: {
@@ -137,6 +114,8 @@ export type Database = {
           created_at: string | null
           id: string
           used: boolean | null
+          used_at: string | null
+          used_by_user_id: string | null
           user_id: string
         }
         Insert: {
@@ -144,6 +123,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           used?: boolean | null
+          used_at?: string | null
+          used_by_user_id?: string | null
           user_id: string
         }
         Update: {
@@ -151,6 +132,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           used?: boolean | null
+          used_at?: string | null
+          used_by_user_id?: string | null
           user_id?: string
         }
         Relationships: []
@@ -186,22 +169,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "memories_friend_id_fkey"
-            columns: ["friend_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "memories_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       memory_comments: {
         Row: {
@@ -399,6 +367,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          invited_by_user_id: string | null
           state: string | null
           updated_at: string | null
           username: string | null
@@ -414,6 +383,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          invited_by_user_id?: string | null
           state?: string | null
           updated_at?: string | null
           username?: string | null
@@ -429,6 +399,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          invited_by_user_id?: string | null
           state?: string | null
           updated_at?: string | null
           username?: string | null
@@ -476,15 +447,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "timeline_events_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_ratings: {
         Row: {
@@ -515,43 +478,37 @@ export type Database = {
       }
       users: {
         Row: {
-          avatar: string | null
-          bio: string | null
-          connected_accounts: Json | null
           created_at: string | null
-          email: string | null
+          email: string
+          first_name: string | null
           id: string
-          join_date: string | null
-          location: string | null
-          name: string
-          privacy_settings: Json | null
+          last_name: string | null
+          middle_name: string | null
+          phone: string | null
           updated_at: string | null
+          username: string | null
         }
         Insert: {
-          avatar?: string | null
-          bio?: string | null
-          connected_accounts?: Json | null
           created_at?: string | null
-          email?: string | null
+          email: string
+          first_name?: string | null
           id: string
-          join_date?: string | null
-          location?: string | null
-          name: string
-          privacy_settings?: Json | null
+          last_name?: string | null
+          middle_name?: string | null
+          phone?: string | null
           updated_at?: string | null
+          username?: string | null
         }
         Update: {
-          avatar?: string | null
-          bio?: string | null
-          connected_accounts?: Json | null
           created_at?: string | null
-          email?: string | null
+          email?: string
+          first_name?: string | null
           id?: string
-          join_date?: string | null
-          location?: string | null
-          name?: string
-          privacy_settings?: Json | null
+          last_name?: string | null
+          middle_name?: string | null
+          phone?: string | null
           updated_at?: string | null
+          username?: string | null
         }
         Relationships: []
       }
