@@ -19,7 +19,7 @@ export default function Address() {
   const [address, setAddress] = useState({
     city: "",
     state: "",
-    zipCode: "",
+    zip_code: "",
     country: "",
   });
 
@@ -37,7 +37,7 @@ export default function Address() {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("address")
+        .select("city, state, zip_code, country")
         .eq("id", session.user.id)
         .single();
 
@@ -46,12 +46,13 @@ export default function Address() {
         return;
       }
 
-      if (data?.address) {
-        setAddress(
-          typeof data.address === "object"
-            ? (data.address as any)
-            : { city: "", state: "", zipCode: "", country: "" },
-        );
+      if (data) {
+        setAddress({
+          city: data.city || "",
+          state: data.state || "",
+          zip_code: data.zip_code || "",
+          country: data.country || "",
+        });
       }
     };
 
@@ -81,7 +82,12 @@ export default function Address() {
 
       const { error } = await supabase
         .from("profiles")
-        .update({ address })
+        .update({
+          city: address.city,
+          state: address.state,
+          zip_code: address.zip_code,
+          country: address.country,
+        })
         .eq("id", session.user.id);
 
       if (error) throw error;
@@ -153,12 +159,12 @@ export default function Address() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="zipCode">Zip/Postal Code</Label>
+          <Label htmlFor="zip_code">Zip/Postal Code</Label>
           <Input
-            id="zipCode"
+            id="zip_code"
             placeholder="Enter your zip or postal code"
-            value={address.zipCode}
-            onChange={(e) => handleChange("zipCode", e.target.value)}
+            value={address.zip_code}
+            onChange={(e) => handleChange("zip_code", e.target.value)}
             required
           />
         </div>
