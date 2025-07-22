@@ -83,14 +83,17 @@ export default function Address() {
       const { error } = await supabase
         .from("profiles")
         .update({
-          city: address.city,
-          state: address.state,
-          zip_code: address.zip_code,
-          country: address.country,
+          city: address.city || null,
+          state: address.state || null,
+          zip_code: address.zip_code || null,
+          country: address.country || null,
         })
         .eq("id", session.user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Database error:", error);
+        throw error;
+      }
 
       toast({
         title: "Address saved",
@@ -100,10 +103,11 @@ export default function Address() {
       // Navigate to the next step
       navigate("/onboarding/social");
     } catch (error: any) {
+      console.error("Address save error:", error);
       toast({
         variant: "destructive",
         title: "Error saving address",
-        description: error.message || "Something went wrong.",
+        description: error.message || "Something went wrong. Please try again.",
       });
     } finally {
       setLoading(false);
