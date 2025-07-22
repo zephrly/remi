@@ -11,10 +11,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { toast } from "../ui/use-toast";
+import { useToast } from "../ui/use-toast";
 
 export default function Address() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [address, setAddress] = useState({
     city: "",
@@ -73,27 +74,48 @@ export default function Address() {
     try {
       const {
         data: { session },
+        error: sessionError,
       } = await supabase.auth.getSession();
 
-      if (!session) {
+      if (sessionError) {
+        console.error("Session error:", sessionError);
+        throw new Error("Authentication error. Please log in again.");
+      }
+
+      if (!session?.user) {
+        console.error("No session found");
         navigate("/login");
         return;
       }
 
-      const { error } = await supabase
+      console.log("Updating profile for user:", session.user.id);
+      console.log("Address data:", address);
+
+      const updateData = {
+        city: address.city.trim() || null,
+        state: address.state.trim() || null,
+        zip_code: address.zip_code.trim() || null,
+        country: address.country || null,
+      };
+
+      const { data, error } = await supabase
         .from("profiles")
-        .update({
-          city: address.city || null,
-          state: address.state || null,
-          zip_code: address.zip_code || null,
-          country: address.country || null,
-        })
-        .eq("id", session.user.id);
+        .update(updateData)
+        .eq("id", session.user.id)
+        .select();
 
       if (error) {
         console.error("Database error:", error);
-        throw error;
+        console.error("Error details:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        throw new Error(`Database error: ${error.message}`);
       }
+
+      console.log("Profile updated successfully:", data);
 
       toast({
         title: "Address saved",
@@ -141,7 +163,7 @@ export default function Address() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="city">City</Label>
+          <Label htmlFor="city">City *</Label>
           <Input
             id="city"
             placeholder="Enter your city"
@@ -152,7 +174,7 @@ export default function Address() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="state">State/Province</Label>
+          <Label htmlFor="state">State/Province *</Label>
           <Input
             id="state"
             placeholder="Enter your state or province"
@@ -163,7 +185,7 @@ export default function Address() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="zip_code">Zip/Postal Code</Label>
+          <Label htmlFor="zip_code">Zip/Postal Code *</Label>
           <Input
             id="zip_code"
             placeholder="Enter your zip or postal code"
@@ -174,7 +196,7 @@ export default function Address() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="country">Country</Label>
+          <Label htmlFor="country">Country *</Label>
           <Select
             value={address.country}
             onValueChange={(value) => handleChange("country", value)}
@@ -198,10 +220,20 @@ export default function Address() {
             type="button"
             variant="outline"
             onClick={() => navigate("/onboarding/dob")}
+            disabled={loading}
           >
             Back
           </Button>
-          <Button type="submit" disabled={loading}>
+          <Button
+            type="submit"
+            disabled={
+              loading ||
+              !address.city ||
+              !address.state ||
+              !address.zip_code ||
+              !address.country
+            }
+          >
             {loading ? "Saving..." : "Continue"}
           </Button>
         </div>
